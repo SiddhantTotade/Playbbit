@@ -25,43 +25,78 @@ public class TranscodeWorker {
     }
 
     private void processVideo(String streamKey) {
-        String outputDir = "/tmp/" + streamKey;
-        new File(outputDir).mkdir();
+        String outputDir = "/tmp/hls/" + streamKey;
+        new File(outputDir).mkdirs();
 
         ProcessBuilder pb = new ProcessBuilder(
                 "ffmpeg",
-                "-i", "rtmp://ingest/live/" + streamKey,
-                "-c:v", "libx264",
-                "-preset", "veryfast",
-                "-c:a", "aac",
-                "-b:a", "128k",
+                "-i", "rtmp://infra-ingest-1/live/" + streamKey,
+                "-c:v", "libx264", "-preset", "veryfast",
+                "-c:a", "aac", "-b:a", "128k",
                 "-f", "hls",
                 "-hls_time", "4",
-                "-hls_list_size", "6",
-                "-hls_segment_filename", outputDir + "/segment_%03d.ts",
+                "-hls_list_size", "0",
+                "-hls_playlist_type", "event",
                 outputDir + "/index.m3u8");
+
+        pb.redirectErrorStream(true);
 
         try {
             Process process = pb.start();
+
             new Thread(() -> {
+                try (java.io.BufferedReader r = new java.io.BufferedReader(
+                        new java.io.InputStreamReader(process.getInputStream()))) {
+                    String l;
+                    while ((l = r.readLine()) != null)
+                        System.out.println("FFMPEG: " + l);
+                } catch (Exception e) {
+                }
+            }).start();
+
+            new Thread(() -> {
+                java.util.Set<String> uploadedFiles = new java.util.HashSet<>();
                 File folder = new File(outputDir);
+
                 while (process.isAlive()) {
-                    File[] files = folder.listFiles();
-                    if (files != null) {
-                        for (File f : files) {
-                            if (f.getName().endsWith(".ts") || f.getName().endsWith(".m3u8")) {
-                                s3UploadService.uploadChunk(f, streamKey + "/" + f.getName());
-                            }
-                        }
-                    }
+                    uploadExistingFiles(folder, streamKey, uploadedFiles);
                     try {
                         Thread.sleep(2000);
                     } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
                     }
                 }
+
+                System.out.println(">>> OBS Disconnected. Finalizing VOD for: " + streamKey);
+
+                try {
+                    Thread.sleep(3000);
+                } catch (InterruptedException e) {
+                } 
+
+                uploadExistingFiles(folder, streamKey, uploadedFiles);
+
+                System.out.println(">>> VOD COMPLETE: " + streamKey + " is now available for playback.");
             }).start();
+
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    private void uploadExistingFiles(File folder, String streamKey, java.util.Set<String> uploadedFiles) {
+        File[] files = folder.listFiles();
+        if (files != null) {
+            for (File f : files) {
+                String s3Path = streamKey + "/" + f.getName();
+                if (f.getName().endsWith(".ts") && !uploadedFiles.contains(f.getName())) {
+                    s3UploadService.uploadChunk(f, s3Path);
+                    uploadedFiles.add(f.getName());
+                } else if (f.getName().endsWith(".m3u8")) {
+                    // The playlist is updated every time to include the newest chunks
+                    s3UploadService.uploadChunk(f, s3Path);
+                }
+            }
         }
     }
 

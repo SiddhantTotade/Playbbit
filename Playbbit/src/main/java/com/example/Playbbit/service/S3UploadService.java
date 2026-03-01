@@ -17,17 +17,22 @@ public class S3UploadService {
     }
 
     public void uploadChunk(File file, String s3Path) {
-        String contentType = "video/MP2T";
-        if (file.getName().endsWith(".m3u8")) {
-            contentType = "application/x-mpegURL";
-        }
-        s3Client.putObject(
-                PutObjectRequest.builder().bucket("live-streams").key(s3Path).contentType(contentType).build(),
-                RequestBody.fromFile(file));
+        try {
+            System.out.println("Attempting upload to MinIO: " + s3Path);
+            s3Client.putObject(
+                    PutObjectRequest.builder()
+                            .bucket("live-streams")
+                            .key(s3Path)
+                            .contentType(file.getName().endsWith(".m3u8") ? "application/x-mpegURL" : "video/MP2T")
+                            .build(),
+                    RequestBody.fromFile(file));
 
-        if (file.getName().endsWith(".ts")) {
-
-            file.delete();
+            System.out.println("SUCCESS: Uploaded " + s3Path);
+            if (file.getName().endsWith(".ts")) {
+                file.delete();
+            }
+        } catch (Exception e) {
+            System.err.println("CRITICAL ERROR: MinIO Upload Failed: " + e.getMessage());
         }
     }
 }
