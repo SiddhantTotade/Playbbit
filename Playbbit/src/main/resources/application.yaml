@@ -1,4 +1,17 @@
 spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 500MB
+  server:
+    connection-timeout: 300000
+    tomcat:
+      max-swallow-size: 500MB
   threads:
     virtual:
       enabled: true

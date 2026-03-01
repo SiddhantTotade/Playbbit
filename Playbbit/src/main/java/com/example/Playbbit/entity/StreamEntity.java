@@ -18,6 +18,8 @@ public class StreamEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    private String title;
+
     @Column(unique = true)
     private String streamKey;
 
@@ -25,6 +27,12 @@ public class StreamEntity {
 
     @Enumerated(EnumType.STRING)
     private StreamStatus status;
+
+    @Enumerated(EnumType.STRING)
+    private VideoType type = VideoType.LIVE;
+
+    @Enumerated(EnumType.STRING)
+    private Visibility visibility = Visibility.PUBLIC;
 
     private String manifestUrl;
 }

@@ -9,6 +9,7 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 @Configuration
 public class S3Config {
@@ -19,5 +20,15 @@ public class S3Config {
                         StaticCredentialsProvider.create(AwsBasicCredentials.create(minioProperties.getAccessKey(),
                                 minioProperties.getSecretKey())))
                 .region(Region.of(minioProperties.getRegion())).forcePathStyle(true).build();
+    }
+
+    @Bean
+    public S3Presigner s3Presigner(MinioProperties properties) {
+        return S3Presigner.builder()
+                .endpointOverride(URI.create(properties.getEndpoint()))
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(properties.getAccessKey(), properties.getSecretKey())))
+                .region(Region.of(properties.getRegion()))
+                .build();
     }
 }
