@@ -5,6 +5,8 @@ import java.io.RandomAccessFile;
 import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,10 +37,15 @@ public class ResumableUploadController {
 
     @PostMapping("/chunk")
     public ResponseEntity<String> uploadChunk(
+            @RequestParam("title") String title,
+            @RequestParam("isPrivate") boolean isPrivate,
             @RequestParam("chunk") MultipartFile chunk,
             @RequestParam("uploadId") String uploadId,
             @RequestParam("totalSize") long totalSize,
-            @RequestParam("fileName") String fileName) throws Exception {
+            @RequestParam("fileName") String fileName,
+            @AuthenticationPrincipal Jwt jwt) throws Exception {
+
+        String userId = jwt.getSubject();
 
         File dir = new File(UPLOAD_DIR);
         if (!dir.exists())
@@ -52,7 +59,7 @@ public class ResumableUploadController {
         }
 
         if (file.length() >= totalSize) {
-            transcodingService.processUploadAsync(file, fileName, uploadId);
+            transcodingService.processUploadAsync(file, fileName, uploadId, userId, title, isPrivate);
             return ResponseEntity.ok("COMPLETE");
         }
 
