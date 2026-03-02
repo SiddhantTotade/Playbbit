@@ -14,9 +14,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.example.Playbbit.entity.StreamEntity;
 import com.example.Playbbit.entity.StreamStatus;
+import com.example.Playbbit.entity.Video;
 import com.example.Playbbit.entity.VideoType;
 import com.example.Playbbit.entity.Visibility;
 import com.example.Playbbit.repository.StreamRepository;
+import com.example.Playbbit.repository.VideoRepository;
 import com.example.Playbbit.service.S3UploadService;
 import com.example.Playbbit.service.VideoLinkService;
 
@@ -24,13 +26,19 @@ import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/videos")
-@CrossOrigin(origins = "http://127.0.0.1:5500")
+@CrossOrigin(origins = "http://localhost:3000")
 @RequiredArgsConstructor
 public class VideoController {
 
     private final S3UploadService s3UploadService;
     private final StreamRepository repository;
     private final VideoLinkService videoLinkService;
+    private final VideoRepository videoRepository;
+
+    @GetMapping("/public")
+    public List<Video> getPublicVideos() {
+        return videoRepository.findByIsPrivateFalseAndStatus(Video.VideoStatus.PUBLISHED);
+    }
 
     @PostMapping("/upload")
     public ResponseEntity<String> uploadVideo(

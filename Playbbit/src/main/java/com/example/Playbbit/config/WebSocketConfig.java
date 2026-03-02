@@ -20,7 +20,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws-video-status")
-                .setAllowedOrigins("http://localhost:3000") // Next.js Address
+                .setAllowedOrigins("http://localhost:3000")
                 .withSockJS();
     }
 }
