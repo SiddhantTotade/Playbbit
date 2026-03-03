@@ -1,25 +1,41 @@
-import NextAuth from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
+import NextAuth, { NextAuthOptions } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
 
-const handler = NextAuth({
+export const authOptions: NextAuthOptions = {
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    CredentialsProvider({
+      id: "credentials",
+      name: "Playbbit Login",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null;
+
+        if (
+          credentials.email === "bunny@playbbit.com" &&
+          credentials.password === "123456"
+        ) {
+          return {
+            id: "1",
+            name: "Playbbit User",
+            email: "bunny@playbbit.com",
+          };
+        }
+
+        return null;
+      },
     }),
   ],
-  callbacks: {
-    async jwt({ token, account }) {
-      if (account) {
-        token.accessToken = account.id_token;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      session.accessToken = token.accessToken;
-      return session;
-    },
+  session: {
+    strategy: "jwt" as const,
   },
-});
+  pages: {
+    signIn: "/login",
+  },
+  secret: process.env.NEXTAUTH_SECRET,
+};
 
+const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };
