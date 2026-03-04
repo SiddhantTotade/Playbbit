@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { getPasswordStrength } from "@/lib/utils";
+import { Icons } from "@/components/icons";
 
 export default function RegisterPage() {
   const [step, setStep] = useState(1);
@@ -88,9 +89,18 @@ export default function RegisterPage() {
           />
         </div>
 
+        {/* Improved Error Display */}
         {error && (
-          <div className="w-full mb-4 p-2.5 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] text-center">
-            {error}
+          <div className="w-full mb-4 p-3 rounded-md bg-red-500/10 border border-red-500/20 flex items-start gap-3 animate-in fade-in slide-in-from-top-1 duration-300">
+            <span className="material-symbols-outlined text-red-500 text-[18px] mt-0.5">
+              warning
+            </span>
+            <div className="flex-1">
+              <p className="text-red-400 text-[11px] font-bold uppercase tracking-tight">
+                Registration Error
+              </p>
+              <p className="text-red-300/80 text-[11px]">{error}</p>
+            </div>
           </div>
         )}
 
@@ -137,7 +147,7 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              <Button className="w-full bg-[#3713ec] hover:bg-[#2500c4] text-white font-bold h-10 mt-2">
+              <Button className="cursor-pointer w-full bg-[#3713ec] hover:bg-[#2500c4] text-white font-bold h-10 mt-2">
                 Continue
                 <span className="material-symbols-outlined ml-2 text-sm">
                   arrow_forward
@@ -254,14 +264,17 @@ export default function RegisterPage() {
             <div className="grid grid-cols-2 gap-3 w-full">
               <Button
                 variant="outline"
-                className="border-white/10 bg-white/5 text-white hover:bg-white/10 text-xs"
+                className="cursor-pointer border-white/10 bg-white/5 text-white hover:bg-white/10 text-xs"
               >
+                <Icons.google className="w-4 h-4 mr-2" />
                 Google
               </Button>
+
               <Button
                 variant="outline"
-                className="border-white/10 bg-white/5 text-white hover:bg-white/10 text-xs"
+                className="cursor-pointer border-white/10 bg-white/5 text-white hover:bg-white/10 text-xs"
               >
+                <Icons.gitHub className="w-4 h-4 mr-2" />
                 GitHub
               </Button>
             </div>
