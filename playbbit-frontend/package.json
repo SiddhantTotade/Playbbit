@@ -9,13 +9,20 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@radix-ui/react-separator": "^1.1.8",
+    "@radix-ui/react-slot": "^1.2.4",
     "@stomp/stompjs": "^7.3.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "hls.js": "^1.6.15",
+    "lucide-react": "^0.577.0",
     "next": "16.1.6",
     "next-auth": "^4.24.13",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "sockjs-client": "^1.6.1"
+    "sockjs-client": "^1.6.1",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.11",
