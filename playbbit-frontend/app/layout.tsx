@@ -1,3 +1,4 @@
+import { AuthProvider } from "@/context/auth-context";
 import "./globals.css";
 import { Spline_Sans } from "next/font/google";
 
@@ -16,7 +17,9 @@ export default function RootLayout({ children }: any) {
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }

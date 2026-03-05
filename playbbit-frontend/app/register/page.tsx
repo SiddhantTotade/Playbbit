@@ -238,7 +238,7 @@ export default function RegisterPage() {
 
               <Button
                 disabled={loading || getPasswordStrength(password) < 2}
-                className="w-full bg-[#3713ec] hover:bg-[#2500c4] text-white font-bold h-10 mt-2 shadow-lg shadow-[#3713ec]/20 transition-all disabled:opacity-50 disabled:shadow-none"
+                className=" cursor-pointer w-full bg-[#3713ec] hover:bg-[#2500c4] text-white font-bold h-10 mt-2 shadow-lg shadow-[#3713ec]/20 transition-all disabled:opacity-50 disabled:shadow-none"
               >
                 {loading ? "Registering..." : "Complete Registration"}
                 {!loading && (
