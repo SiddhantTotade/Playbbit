@@ -1,29 +1,69 @@
 "use client";
 
 import React, { useRef, useState } from "react";
+import Hls from "hls.js";
 
 interface VideoCardProps {
   title: string;
-  hlsUrl: string; // The MinIO signed URL or stream endpoint
+  hlsUrl: string;
   thumbnail: string;
 }
 
 export const VideoCard = ({ title, hlsUrl, thumbnail }: VideoCardProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const [isHovering, setIsHovering] = useState(false);
 
   const handleMouseEnter = () => {
     setIsHovering(true);
-    videoRef.current
-      ?.play()
-      .catch((err) => console.log("Autoplay blocked", err));
+
+    if (videoRef.current) {
+      const videoElement = videoRef.current;
+      videoElement.muted = true;
+
+      if (Hls.isSupported()) {
+        if (hlsRef.current) {
+          hlsRef.current.destroy();
+        }
+
+        const hls = new Hls();
+        hlsRef.current = hls;
+
+        // Use the prop 'hlsUrl' directly (fixed "Cannot find name 'video'")
+        hls.loadSource(hlsUrl);
+        hls.attachMedia(videoElement);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          videoElement.play().catch((err) => {
+            console.warn("Autoplay blocked:", err);
+          });
+        });
+
+        // Error handling for "Media not suitable" issues
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          if (data.fatal) {
+            console.error("HLS fatal error:", data.type);
+          }
+        });
+      } else if (videoElement.canPlayType("application/vnd.apple.mpegurl")) {
+        // Native support (Safari/iOS)
+        videoElement.src = hlsUrl;
+        videoElement.play().catch((e) => console.warn(e));
+      }
+    }
   };
 
   const handleMouseLeave = () => {
     setIsHovering(false);
+
     if (videoRef.current) {
       videoRef.current.pause();
-      videoRef.current.currentTime = 0; // Reset to start
+      videoRef.current.currentTime = 0;
+    }
+
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
     }
   };
 
@@ -33,28 +73,26 @@ export const VideoCard = ({ title, hlsUrl, thumbnail }: VideoCardProps) => {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      {/* Video Container */}
       <div className="aspect-video w-full relative bg-black">
-        {/* Placeholder Thumbnail */}
-        {!isHovering && (
-          <img
-            src={thumbnail}
-            alt={title}
-            className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300"
-          />
-        )}
+        <img
+          src={thumbnail}
+          alt={title}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+            isHovering ? "opacity-0" : "opacity-100"
+          }`}
+        />
 
         <video
           ref={videoRef}
-          src={hlsUrl}
           muted
           loop
           playsInline
-          className={`w-full h-full object-cover transition-opacity duration-500 ${isHovering ? "opacity-100" : "opacity-0"}`}
+          className={`w-full h-full object-cover transition-opacity duration-500 ${
+            isHovering ? "opacity-100" : "opacity-0"
+          }`}
         />
       </div>
 
-      {/* Info Section */}
       <div className="p-3">
         <h3 className="text-sm font-semibold text-slate-200 truncate group-hover:text-white transition-colors">
           {title}
