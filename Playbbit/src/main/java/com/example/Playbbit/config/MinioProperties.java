@@ -12,6 +12,7 @@ import lombok.Setter;
 @Setter
 public class MinioProperties {
     private String endpoint;
+    private String externalUrl;
     private String accessKey;
     private String secretKey;
     private String region;

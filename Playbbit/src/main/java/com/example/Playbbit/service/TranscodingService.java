@@ -7,6 +7,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import com.example.Playbbit.config.MinioProperties;
 import com.example.Playbbit.entity.Video;
 import com.example.Playbbit.repository.VideoRepository;
 
@@ -18,19 +19,20 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class TranscodingService {
 
+    private final MinioProperties minioProperties;
     private final S3UploadService s3UploadService;
     private final SimpMessagingTemplate messagingTemplate;
-    private final VideoRepository videoRepository; // Injected
+    private final VideoRepository videoRepository;
     private static final String HLS_OUTPUT_DIR = "hls-output/";
 
     @Async
-    // 1. ADD: title and isPrivate to the parameters
     public void processUploadAsync(File inputFile, String originalName, String uploadId, String userId, String title,
             boolean isPrivate) {
+        log.info("!!! ASYNC PROCESS STARTED for uploadId: {} !!!", uploadId);
+        log.info("Input file path: {}, exists: {}", inputFile.getAbsolutePath(), inputFile.exists());
         String topic = "/topic/upload/" + uploadId;
 
         try {
-            // 2. CREATE: Initial Database Record as "TRANSCODING"
             Video video = Video.builder()
                     .id(uploadId)
                     .title(title)
@@ -72,17 +74,19 @@ public class TranscodingService {
                 File[] files = outputFolder.listFiles();
                 if (files != null) {
                     for (File f : files) {
-                        // The path in MinIO
                         String minioPath = "uploads/" + userId + "/" + uploadId + "/" + f.getName();
                         s3UploadService.uploadChunk(f, minioPath);
                     }
                 }
 
-                // 3. UPDATE: Database to "PUBLISHED" and save the MinIO URL
                 video.setStatus(Video.VideoStatus.PUBLISHED);
-                // This URL will be used by the frontend HLS player
-                video.setHlsUrl("/uploads/" + userId + "/" + uploadId + "/index.m3u8");
+                String baseUrl = minioProperties.getExternalUrl();
+                String hlsPath = "/live-streams/uploads/" + userId + "/" + uploadId + "/index.m3u8";
+                video.setHlsUrl(baseUrl + hlsPath);
+                // video.setHlsUrl("/uploads/" + userId + "/" + uploadId + "/index.m3u8");
+
                 videoRepository.save(video);
+                log.info("Video {} is now PUBLISHED and visible to frontend", uploadId);
 
                 cleanup(outputFolder, inputFile);
                 log.info("Cleanup complete for uploadId: {}", uploadId);

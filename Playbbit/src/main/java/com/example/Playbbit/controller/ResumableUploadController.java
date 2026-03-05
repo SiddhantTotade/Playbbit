@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -45,7 +46,7 @@ public class ResumableUploadController {
             @RequestParam("fileName") String fileName,
             @AuthenticationPrincipal Jwt jwt) throws Exception {
 
-        String userId = jwt.getSubject();
+        String userId = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         File dir = new File(UPLOAD_DIR);
         if (!dir.exists())
