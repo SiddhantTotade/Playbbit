@@ -40,10 +40,13 @@ public class SecurityConfig {
                                 .sessionManagement(session -> session
                                                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                                 .authorizeHttpRequests(auth -> auth
+                                                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                                                 .requestMatchers("/api/auth/**").permitAll()
-                                                .requestMatchers(HttpMethod.GET, "/api/videos/public").permitAll()
+                                                .requestMatchers(HttpMethod.GET, "/api/videos/feed").permitAll()
+                                                .requestMatchers(HttpMethod.GET, "/api/videos/live/public").permitAll()
+                                                .requestMatchers(HttpMethod.GET, "/api/videos/*").permitAll()
                                                 // 2. Ensure the upload path is authenticated
-                                                .requestMatchers("/api/videos/upload").authenticated()
+                                                .requestMatchers("/api/upload/**").authenticated()
                                                 .anyRequest().authenticated())
                                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 

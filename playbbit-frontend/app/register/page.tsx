@@ -52,8 +52,8 @@ export default function RegisterPage() {
 
     try {
       const baseUrl =
-        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
-      const res = await fetch(`${baseUrl}/api/auth/register`, {
+        process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api";
+      const res = await fetch(`${baseUrl}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password }),
@@ -115,7 +115,7 @@ export default function RegisterPage() {
                   Full Name
                 </label>
                 <div className="relative flex items-center">
-                  <span className="material-symbols-outlined absolute left-3 text-slate-500 text-[20px]">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-[20px]">
                     person
                   </span>
                   <Input
@@ -133,7 +133,7 @@ export default function RegisterPage() {
                   Email address
                 </label>
                 <div className="relative flex items-center">
-                  <span className="material-symbols-outlined absolute left-3 text-slate-500 text-[20px]">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-[20px]">
                     mail
                   </span>
                   <Input
@@ -174,7 +174,7 @@ export default function RegisterPage() {
                   Password
                 </label>
                 <div className="relative flex items-center">
-                  <span className="material-symbols-outlined absolute left-3 text-slate-500 text-[20px]">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-[20px]">
                     vpn_key
                   </span>
                   <Input
@@ -192,15 +192,14 @@ export default function RegisterPage() {
                     {[1, 2, 3, 4].map((s) => (
                       <div
                         key={s}
-                        className={`h-full flex-1 rounded-full transition-all duration-500 ${
-                          getPasswordStrength(password) >= s
-                            ? getPasswordStrength(password) <= 2
-                              ? "bg-red-500"
-                              : getPasswordStrength(password) === 3
-                                ? "bg-orange-500"
-                                : "bg-emerald-500"
-                            : "bg-white/10"
-                        }`}
+                        className={`h-full flex-1 rounded-full transition-all duration-500 ${getPasswordStrength(password) >= s
+                          ? getPasswordStrength(password) <= 2
+                            ? "bg-red-500"
+                            : getPasswordStrength(password) === 3
+                              ? "bg-orange-500"
+                              : "bg-emerald-500"
+                          : "bg-white/10"
+                          }`}
                       />
                     ))}
                   </div>
@@ -209,7 +208,7 @@ export default function RegisterPage() {
                     <span className="ml-1 text-slate-300">
                       {
                         ["Too Weak", "Weak", "Fair", "Good", "Strong"][
-                          getPasswordStrength(password)
+                        getPasswordStrength(password)
                         ]
                       }
                     </span>
@@ -222,7 +221,7 @@ export default function RegisterPage() {
                   Confirm Password
                 </label>
                 <div className="relative flex items-center">
-                  <span className="material-symbols-outlined absolute left-3 text-slate-500 text-[20px]">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-[20px]">
                     lock_reset
                   </span>
                   <Input

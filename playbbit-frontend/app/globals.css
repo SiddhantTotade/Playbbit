@@ -8,13 +8,13 @@
   --color-playbbit-blue: #3713ec;
   --color-playbbit-pink: #ff69b4;
   --color-playbbit-orange: #ff8c00;
-  
+
   /* Standard shadcn/ui v4 variables */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -33,32 +33,37 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  --font-sans: var(--font-spline), ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Base Shadcn Variables */
 :root {
-    --radius: 0.625rem;
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --primary: #3713ec; /* Set your Playbbit blue as primary */
-    --primary-foreground: oklch(0.985 0 0);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: #3713ec;
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --primary: #3713ec;
+  /* Set your Playbbit blue as primary */
+  --primary-foreground: oklch(0.985 0 0);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: #3713ec;
 }
 
 /* Dark Mode Overrides - Crucial for the "OLED" look */
 .dark {
-    --background: #0a0a0c; /* Your specific dark background */
-    --foreground: oklch(0.985 0 0);
-    --card: #16161a;      /* Your specific card background */
-    --card-foreground: oklch(0.985 0 0);
-    --primary: #3713ec;
-    --primary-foreground: oklch(0.985 0 0);
-    --border: rgba(255, 255, 255, 0.1);
-    --input: rgba(255, 255, 255, 0.05);
+  --background: #0a0a0c;
+  /* Your specific dark background */
+  --foreground: oklch(0.985 0 0);
+  --card: #16161a;
+  /* Your specific card background */
+  --card-foreground: oklch(0.985 0 0);
+  --primary: #3713ec;
+  --primary-foreground: oklch(0.985 0 0);
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.05);
 }
 
 /* Helper for Material Icons */
@@ -68,10 +73,27 @@
   line-height: 1;
 }
 
-/* Autofill Fix - Keep this or inputs look ugly when saved passwords load */
+/* Global Cursor Fix - Ensure all interactive elements show the hand cursor */
+button,
+a,
+[role="button"],
+.cursor-pointer,
+input[type="submit"],
+input[type="button"],
+select {
+  cursor: pointer !important;
+}
+
+/* Specific fix for inputs for better UX */
+input[type="file"],
+input[type="checkbox"],
+input[type="radio"] {
+  cursor: pointer !important;
+}
+
 input:-webkit-autofill {
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: white !important;
-    transition: background-color 5000s ease-in-out 0s;
-    box-shadow: inset 0 0 20px 20px transparent;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: white !important;
+  transition: background-color 5000s ease-in-out 0s;
+  box-shadow: inset 0 0 20px 20px transparent;
 }

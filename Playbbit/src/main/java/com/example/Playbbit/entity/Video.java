@@ -31,7 +31,12 @@ public class Video {
     private String userName;
 
     private String hlsUrl;
+
+    @jakarta.persistence.Column(name = "is_private")
+    @com.fasterxml.jackson.annotation.JsonProperty("isPrivate")
     private boolean isPrivate;
+
+    private String thumbnailUrl;
 
     @Enumerated(EnumType.STRING)
     private VideoStatus status;

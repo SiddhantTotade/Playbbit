@@ -1,58 +1,167 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
+import { useSession } from "next-auth/react";
 import VideoPlayer from "@/components/VideoPlayer";
+import { MainLayout } from "@/components/layout/main-layout";
+import { getMediaUrl } from "@/lib/media-utils";
 
-export default function WatchPage({ params }: { params: { id: string } }) {
+export default function WatchPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const { data: session, status: authStatus } = useSession();
   const [video, setVideo] = useState<any>(null);
-  const MINIO_BASE_URL = "http://localhost:9000/playbbit-bucket";
+  const [loading, setLoading] = useState(true);
+  const [restrictedAccess, setRestrictedAccess] = useState(false);
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api";
+
+  const checkAccess = async () => {
+    try {
+      const token = (session as any)?.accessToken;
+      const headers: any = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const res = await fetch(`${API_BASE_URL}/videos/${id}`, { headers });
+
+      if (res.status === 403) {
+        setRestrictedAccess(true);
+        return false;
+      }
+
+      if (!res.ok) throw new Error("Failed to fetch");
+
+      const data = await res.json();
+      setVideo(data);
+      setRestrictedAccess(false);
+      return true;
+    } catch (err) {
+      console.error("Heartbeat check failed:", err);
+      return true; // Don't block on transient network errors
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    fetch(`http://localhost:8080/api/videos/${params.id}`)
-      .then((res) => res.json())
-      .then((data) => setVideo(data));
-  }, [params.id]);
+    if (authStatus === "loading") return;
 
-  if (!video) return <div className="p-20 text-center">Loading Video...</div>;
+    // Initial check
+    checkAccess();
 
-  const fullHlsUrl = `${MINIO_BASE_URL}${video.hlsUrl}`;
+    // Heartbeat polling every 5 seconds for immediate privacy enforcement
+    const intervalId = setInterval(async () => {
+      const hasAccess = await checkAccess();
+      if (!hasAccess) clearInterval(intervalId);
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [id, authStatus, session]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0c] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-[#3713ec]"></div>
+      </div>
+    );
+  }
+
+  if (restrictedAccess) {
+    return (
+      <MainLayout>
+        <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
+          <div className="w-24 h-24 bg-amber-500/10 rounded-full flex items-center justify-center mb-6 border border-amber-500/20">
+            <span className="material-symbols-outlined text-amber-500 text-5xl">lock</span>
+          </div>
+          <h1 className="text-4xl font-black text-white mb-4 tracking-tight">This Video is Private <span className="text-amber-500">.</span></h1>
+          <p className="text-slate-400 max-w-md mx-auto mb-10 text-lg">
+            The creator has restricted access to this content. It's no longer available for public viewing.
+          </p>
+          <button
+            onClick={() => window.location.href = "/"}
+            className="px-8 py-3 bg-[#3713ec] hover:bg-[#2500c4] text-white rounded-2xl font-bold transition-all"
+          >
+            Back to Home
+          </button>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (!video) return null;
 
   return (
-    <main className="max-w-6xl mx-auto p-6 lg:p-12">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
-          <VideoPlayer src={fullHlsUrl} />
+    <MainLayout>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <div className="lg:col-span-2 space-y-8">
+          <div className="rounded-3xl overflow-hidden shadow-2xl shadow-[#3713ec]/10 border border-white/5 bg-black/40 backdrop-blur-sm relative">
+            <VideoPlayer src={video.hlsUrl} poster={video.thumbnailUrl} />
+          </div>
+          {/* ... rest of the component remains the same ... */}
+          <div className="bg-white/5 border border-white/5 rounded-3xl p-8 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <h1 className="text-3xl font-black tracking-tight text-white mb-6">
+              {video.title}
+            </h1>
 
-          <div className="mt-6">
-            <h1 className="text-2xl font-bold text-white">{video.title}</h1>
-            <div className="flex items-center justify-between mt-4 pb-6 border-b border-zinc-800">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center font-bold">
-                  {video.userId.charAt(0).toUpperCase()}
+            <div className="flex flex-wrap items-center justify-between gap-6 pb-8 border-b border-white/5">
+              <div className="flex items-center gap-4">
+                <div className="relative group">
+                  <div className="w-14 h-14 bg-gradient-to-tr from-[#3713ec] to-[#ff69b4] rounded-2xl flex items-center justify-center text-xl font-black text-white shadow-lg ring-2 ring-white/10 group-hover:scale-105 transition-transform">
+                    {video.userName ? video.userName.charAt(0).toUpperCase() : video.userId.toString().charAt(0).toUpperCase()}
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 border-[3px] border-[#0a0a0c] rounded-full" />
                 </div>
-                <div>
-                  <p className="font-medium">
-                    User {video.userId.substring(0, 8)}
+
+                <div className="flex flex-col">
+                  <p className="font-bold text-lg text-white group-hover:text-[#3713ec] transition-colors cursor-pointer">
+                    {video.userName || `User ${video.userId.toString().substring(0, 8)}`}
                   </p>
-                  <p className="text-xs text-zinc-400">
-                    Published on{" "}
-                    {new Date(video.createdAt).toLocaleDateString()}
+                  <p className="text-xs text-slate-500 font-medium">
+                    Published {new Date(video.createdAt).toLocaleDateString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
                   </p>
                 </div>
               </div>
+
+              <div className="flex items-center gap-3">
+                <button className="flex items-center gap-2 px-6 py-3 bg-[#3713ec] hover:bg-[#2500c4] text-white rounded-2xl font-bold text-sm transition-all active:scale-95 shadow-lg shadow-[#3713ec]/20">
+                  <span className="material-symbols-outlined text-lg">thumb_up</span>
+                  Like
+                </button>
+                <button className="flex items-center justify-center w-12 h-12 bg-white/5 hover:bg-white/10 text-white rounded-2xl transition-all active:scale-95 border border-white/5">
+                  <span className="material-symbols-outlined">share</span>
+                </button>
+              </div>
             </div>
-            <p className="mt-6 text-zinc-300">
-              {video.description || "No description provided."}
-            </p>
+
+            <div className="mt-8">
+              <p className="text-slate-300 leading-relaxed max-w-none prose prose-invert">
+                {video.description || "No description provided for this video. The creator let the content speak for itself! 🎞️"}
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="hidden lg:block">
-          <h2 className="font-bold mb-4">Up Next</h2>
-          <div className="space-y-4 text-sm text-zinc-500 italic">
-            Recommendations appearing soon...
+        <div className="space-y-8">
+          <div className="bg-white/5 border border-white/5 rounded-3xl p-8 backdrop-blur-sm">
+            <h2 className="text-xl font-black text-white mb-6 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#3713ec]">auto_awesome</span>
+              Up Next
+            </h2>
+            <div className="space-y-6">
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="w-16 h-16 bg-[#3713ec]/10 rounded-full flex items-center justify-center mb-4">
+                  <span className="material-symbols-outlined text-[#3713ec] text-3xl animate-pulse">explore</span>
+                </div>
+                <p className="text-sm font-bold text-slate-400">Expanding logic...</p>
+                <p className="text-[11px] text-slate-600 mt-2 max-w-[200px]">
+                  Our recommendation algorithm is gathering steam. Check back very soon!
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </main>
+    </MainLayout>
   );
 }

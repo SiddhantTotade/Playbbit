@@ -28,8 +28,8 @@ export default function ForgotPasswordPage() {
 
     try {
       const baseUrl =
-        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
-      const res = await fetch(`${baseUrl}/api/auth/forgot-password`, {
+        process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api";
+      const res = await fetch(`${baseUrl}/auth/forgot-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

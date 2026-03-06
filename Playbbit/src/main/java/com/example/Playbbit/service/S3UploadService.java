@@ -5,6 +5,7 @@ import java.io.File;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.example.Playbbit.config.MinioProperties;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -12,29 +13,29 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 @Service
 public class S3UploadService {
     private final S3Client s3Client;
-    private final String BUCKET = "live-streams";
+    private final MinioProperties minioProperties;
 
-    public S3UploadService(S3Client s3Client) {
+    public S3UploadService(S3Client s3Client, MinioProperties minioProperties) {
         this.s3Client = s3Client;
+        this.minioProperties = minioProperties;
     }
 
     public void uploadChunk(File file, String s3Path) {
-        try {
-            System.out.println("Attempting upload to MinIO: " + s3Path);
-            s3Client.putObject(
-                    PutObjectRequest.builder()
-                            .bucket("live-streams")
-                            .key(s3Path)
-                            .contentType(file.getName().endsWith(".m3u8") ? "application/x-mpegURL" : "video/MP2T")
-                            .build(),
-                    RequestBody.fromFile(file));
+        String contentType = "video/MP2T";
+        if (file.getName().endsWith(".m3u8")) {
+            contentType = "application/x-mpegURL";
+        }
 
-            System.out.println("SUCCESS: Uploaded " + s3Path);
-            if (file.getName().endsWith(".ts")) {
-                file.delete();
-            }
-        } catch (Exception e) {
-            System.err.println("CRITICAL ERROR: MinIO Upload Failed: " + e.getMessage());
+        s3Client.putObject(
+                PutObjectRequest.builder()
+                        .bucket(minioProperties.getBucket())
+                        .key(s3Path)
+                        .contentType(contentType)
+                        .build(),
+                RequestBody.fromFile(file));
+
+        if (file.getName().endsWith(".ts")) {
+            file.delete();
         }
     }
 
@@ -46,7 +47,7 @@ public class S3UploadService {
     private void uploadToS3(RequestBody body, String key, String contentType) {
         s3Client.putObject(
                 PutObjectRequest.builder()
-                        .bucket(BUCKET)
+                        .bucket(minioProperties.getBucket())
                         .key(key)
                         .contentType(contentType)
                         .build(),

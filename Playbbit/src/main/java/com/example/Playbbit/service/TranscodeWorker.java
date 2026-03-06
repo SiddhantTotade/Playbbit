@@ -44,40 +44,43 @@ public class TranscodeWorker {
         try {
             Process process = pb.start();
 
-            new Thread(() -> {
+            java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+
+            executor.submit(() -> {
                 try (java.io.BufferedReader r = new java.io.BufferedReader(
                         new java.io.InputStreamReader(process.getInputStream()))) {
                     String l;
                     while ((l = r.readLine()) != null)
                         System.out.println("FFMPEG: " + l);
                 } catch (Exception e) {
+                    System.err.println("Error reading FFMPEG output: " + e.getMessage());
                 }
-            }).start();
+            });
 
-            new Thread(() -> {
-                java.util.Set<String> uploadedFiles = new java.util.HashSet<>();
-                File folder = new File(outputDir);
-
-                while (process.isAlive()) {
-                    uploadExistingFiles(folder, streamKey, uploadedFiles);
-                    try {
-                        Thread.sleep(2000);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-                }
-
-                System.out.println(">>> OBS Disconnected. Finalizing VOD for: " + streamKey);
-
+            executor.submit(() -> {
                 try {
+                    java.util.Set<String> uploadedFiles = new java.util.HashSet<>();
+                    File folder = new File(outputDir);
+
+                    while (process.isAlive()) {
+                        uploadExistingFiles(folder, streamKey, uploadedFiles);
+                        Thread.sleep(2000);
+                    }
+
+                    System.out.println(">>> OBS Disconnected. Finalizing VOD for: " + streamKey);
                     Thread.sleep(3000);
+
+                    uploadExistingFiles(folder, streamKey, uploadedFiles);
+                    System.out.println(">>> VOD COMPLETE: " + streamKey + " is now available for playback.");
                 } catch (InterruptedException e) {
-                } 
-
-                uploadExistingFiles(folder, streamKey, uploadedFiles);
-
-                System.out.println(">>> VOD COMPLETE: " + streamKey + " is now available for playback.");
-            }).start();
+                    Thread.currentThread().interrupt();
+                    System.err.println("Upload Thread Interrupted: " + e.getMessage());
+                } catch (Exception e) {
+                    System.err.println("Error during upload process: " + e.getMessage());
+                } finally {
+                    executor.shutdown();
+                }
+            });
 
         } catch (Exception e) {
             e.printStackTrace();

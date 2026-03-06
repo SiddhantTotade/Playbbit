@@ -2,25 +2,43 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { AuthCard } from "@/components/auth/auth-card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Icons } from "@/components/icons";
-import { useAuth } from "@/hooks/use-auth";
 
 export default function LoginPage() {
+  const router = useRouter();
   const inputStyles =
     "pl-10 bg-white/5 border-white/10 text-white placeholder:text-slate-500/50 focus-visible:ring-[#3713ec] transition-all";
 
-  const { login, loading, error } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    login({ email, password });
+    setLoading(true);
+    setError(null);
+
+    const result = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+
+    if (result?.error) {
+      setError("Invalid email or password");
+      setLoading(false);
+    } else {
+      router.push("/");
+      router.refresh();
+    }
   };
 
   return (
@@ -35,13 +53,12 @@ export default function LoginPage() {
           </div>
         )}
         <form className="w-full space-y-4" onSubmit={handleSubmit}>
-          {/* Email Field */}
           <div className="space-y-2">
             <label className="text-slate-300 text-xs font-medium ml-1">
               Email Address
             </label>
             <div className="relative flex items-center">
-              <span className="material-symbols-outlined absolute left-3 text-slate-500 text-[20px]">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-[20px]">
                 mail
               </span>
               <Input
@@ -55,7 +72,6 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Password Field */}
           <div className="space-y-2">
             <div className="flex justify-between items-center px-1">
               <label className="text-slate-300 text-xs font-medium">
@@ -69,7 +85,7 @@ export default function LoginPage() {
               </Link>
             </div>
             <div className="relative flex items-center">
-              <span className="material-symbols-outlined absolute left-3 text-slate-500 text-[20px]">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-[20px]">
                 vpn_key
               </span>
               <Input
@@ -84,8 +100,9 @@ export default function LoginPage() {
           </div>
 
           <Button
+            type="submit"
             disabled={loading}
-            className=" cursor-pointer w-full bg-[#3713ec] hover:bg-[#2500c4] text-white font-bold h-10 mt-2 shadow-lg shadow-[#3713ec]/20 transition-all"
+            className="cursor-pointer w-full bg-[#3713ec] hover:bg-[#2500c4] text-white font-bold h-10 mt-2 shadow-lg shadow-[#3713ec]/20 transition-all"
           >
             {loading ? "Authenticating..." : "Log In"}
             {!loading && (
@@ -96,7 +113,6 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        {/* Social Login Divider */}
         <div className="w-full flex items-center gap-3 my-6">
           <Separator className="flex-1 bg-white/5" />
           <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">
@@ -105,9 +121,10 @@ export default function LoginPage() {
           <Separator className="flex-1 bg-white/5" />
         </div>
 
-        {/* Social Buttons */}
         <div className="grid grid-cols-2 gap-3 w-full">
           <Button
+            type="button"
+            onClick={() => signIn("google")}
             variant="outline"
             className="cursor-pointer border-white/10 bg-white/5 text-white hover:bg-white/10 text-xs"
           >
@@ -116,6 +133,8 @@ export default function LoginPage() {
           </Button>
 
           <Button
+            type="button"
+            onClick={() => signIn("github")}
             variant="outline"
             className="cursor-pointer border-white/10 bg-white/5 text-white hover:bg-white/10 text-xs"
           >

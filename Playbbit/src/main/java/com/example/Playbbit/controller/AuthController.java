@@ -4,7 +4,6 @@ import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@org.springframework.web.bind.annotation.CrossOrigin(origins = "http://localhost:3000")
 public class AuthController {
 
     private final UserRepository userRepository;
@@ -31,8 +31,11 @@ public class AuthController {
         String password = body.get("password");
         String name = body.get("name");
 
+        System.out.println("Register attempt for email: " + email);
+
         if (userRepository.findByEmail(email).isPresent()) {
-            return ResponseEntity.badRequest().body("Email already exists");
+            System.out.println("Registration failed: Email already exists: " + email);
+            return ResponseEntity.badRequest().body(Map.of("message", "Email already exists"));
         }
 
         User newUser = User.builder()
@@ -43,24 +46,34 @@ public class AuthController {
                 .build();
 
         userRepository.save(newUser);
-        return ResponseEntity.ok("User registered successfully");
+        System.out.println("User registered successfully: " + email);
+        return ResponseEntity.ok(Map.of("message", "User registered successfully"));
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> body) {
-        User user = userRepository.findByEmail(body.get("email"))
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        String email = body.get("email");
+        String password = body.get("password");
 
-        if (!passwordEncoder.matches(body.get("password"), user.getPassword())) {
-            return ResponseEntity.status(401).body("Invalid credentials");
-        }
+        System.out.println("Login attempt for email: " + email);
 
-        String token = jwtService.generateToken(user.getEmail());
-        return ResponseEntity.ok(Map.of("token", token, "user", user));
-    }
-
-    @GetMapping("/me")
-    public ResponseEntity<?> getMyInfo(java.security.Principal principal) {
-        return ResponseEntity.ok("You are logged in as: " + principal.getName());
+        return userRepository.findByEmail(email)
+                .map(user -> {
+                    if (passwordEncoder.matches(password, user.getPassword())) {
+                        System.out.println("Login successful for email: " + email);
+                        String token = jwtService.generateToken(user.getEmail());
+                        Map<String, Object> userMap = Map.of(
+                                "id", user.getId(),
+                                "name", user.getName() != null ? user.getName() : "",
+                                "email", user.getEmail());
+                        return ResponseEntity.ok(Map.of("token", token, "user", userMap));
+                    }
+                    System.out.println("Login failed: Invalid credentials for email: " + email);
+                    return ResponseEntity.status(401).body(Map.of("message", "Invalid credentials"));
+                })
+                .orElseGet(() -> {
+                    System.out.println("Login failed: User not found: " + email);
+                    return ResponseEntity.status(404).body(Map.of("message", "User not found"));
+                });
     }
 }

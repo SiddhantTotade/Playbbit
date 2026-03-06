@@ -13,7 +13,8 @@ export const authOptions: NextAuthOptions = {
       // lib/auth.ts
       async authorize(credentials) {
         try {
-          const res = await fetch("http://localhost:8080/api/auth/login", {
+          const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api";
+          const res = await fetch(`${baseUrl}/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -24,10 +25,12 @@ export const authOptions: NextAuthOptions = {
 
           const data = await res.json();
 
-          console.log("8080 Backend Status:", res.status);
-          console.log("8080 Backend Data:", data);
+          console.log(`Login attempt for ${credentials?.email} to ${baseUrl}/auth/login`);
+          console.log("Backend response status:", res.status);
+          console.log("Backend response data:", data);
 
           if (res.ok && data.token) {
+            console.log("Login successful, token received");
             return {
               id: data.user.id.toString(),
               name: data.user.name,
@@ -36,9 +39,10 @@ export const authOptions: NextAuthOptions = {
             };
           }
 
+          console.warn("Login failed: Backend returned non-ok status or no token");
           return null;
         } catch (error) {
-          console.error("8080 Connection Error:", error);
+          console.error("Login authorize error:", error);
           return null;
         }
       },
@@ -53,9 +57,11 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
-        (session.user as any).accessToken = token.accessToken;
-        (session.user as any).id = token.id;
+      if (session) {
+        (session as any).accessToken = token.accessToken;
+        if (session.user) {
+          (session.user as any).id = token.id;
+        }
       }
       return session;
     },

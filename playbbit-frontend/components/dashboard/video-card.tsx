@@ -1,20 +1,73 @@
 "use client";
 
 import React, { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Hls from "hls.js";
+import { getMediaUrl } from "@/lib/media-utils";
+import { useSession } from "next-auth/react";
+import { toggleVideoVisibility } from "@/lib/upload-service";
 
 interface VideoCardProps {
+  id: string;
   title: string;
   hlsUrl: string;
   thumbnail: string;
+  isPrivate?: boolean;
+  isOwner?: boolean;
+  status?: string;
 }
 
-export const VideoCard = ({ title, hlsUrl, thumbnail }: VideoCardProps) => {
+export const VideoCard = ({ id, title, hlsUrl, thumbnail, isPrivate: initialIsPrivate, isOwner, status }: VideoCardProps) => {
+  const router = useRouter();
+  const { data: session } = useSession();
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [isHovering, setIsHovering] = useState(false);
 
+  const [isPrivate, setIsPrivate] = useState(initialIsPrivate || false);
+  const [isToggling, setIsToggling] = useState(false);
+
+  // Sync state if props change (e.g. after re-fetch)
+  React.useEffect(() => {
+    setIsPrivate(initialIsPrivate || false);
+  }, [initialIsPrivate]);
+
+  const handleToggleVisibility = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation(); // Prevents navigating to watch page
+    console.log(`VideoCard: Toggling visibility for ${id}. Current status: ${isPrivate}`);
+
+    if (isToggling || !session) {
+      console.warn("VideoCard: Toggle blocked (toggling in progress or no session)");
+      return;
+    }
+
+    try {
+      setIsToggling(true);
+      const token = (session as any)?.accessToken;
+      if (!token) throw new Error("No access token found");
+
+      console.log("VideoCard: Calling API...");
+      const updatedVideo = await toggleVideoVisibility(id, token);
+      console.log("VideoCard: API Response (Stringified):", JSON.stringify(updatedVideo));
+
+      // Try both isPrivate and privateVideo just in case of serialization edge cases
+      const newStatus = updatedVideo.isPrivate ?? updatedVideo.privateVideo ?? updatedVideo.private;
+
+      setIsPrivate(newStatus);
+      console.log(`VideoCard: New status set to ${newStatus}`);
+    } catch (err: any) {
+      console.error("VideoCard: Failed to toggle visibility:", err);
+      alert(`Failed to change visibility: ${err.message}`);
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
   const handleMouseEnter = () => {
+    const isProcessing = status === "TRANSCODING" || status === "PENDING";
+    if (isProcessing) return;
+
     setIsHovering(true);
 
     if (videoRef.current) {
@@ -29,8 +82,7 @@ export const VideoCard = ({ title, hlsUrl, thumbnail }: VideoCardProps) => {
         const hls = new Hls();
         hlsRef.current = hls;
 
-        // Use the prop 'hlsUrl' directly (fixed "Cannot find name 'video'")
-        hls.loadSource(hlsUrl);
+        hls.loadSource(getMediaUrl(hlsUrl));
         hls.attachMedia(videoElement);
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -47,7 +99,7 @@ export const VideoCard = ({ title, hlsUrl, thumbnail }: VideoCardProps) => {
         });
       } else if (videoElement.canPlayType("application/vnd.apple.mpegurl")) {
         // Native support (Safari/iOS)
-        videoElement.src = hlsUrl;
+        videoElement.src = getMediaUrl(hlsUrl);
         videoElement.play().catch((e) => console.warn(e));
       }
     }
@@ -69,17 +121,55 @@ export const VideoCard = ({ title, hlsUrl, thumbnail }: VideoCardProps) => {
 
   return (
     <div
-      className="group relative bg-white/5 rounded-xl overflow-hidden border border-white/10 transition-all hover:scale-[1.02] hover:border-[#3713ec]/50 hover:shadow-2xl hover:shadow-[#3713ec]/10"
+      className={`group relative bg-[#0f0f12] rounded-[2rem] overflow-hidden border-2 transition-colors duration-300 cursor-pointer shadow-2xl ${isToggling ? "opacity-60 pointer-events-none" : ""
+        } ${isPrivate
+          ? "border-amber-500/40 shadow-amber-500/10 ring-4 ring-amber-500/5"
+          : "border-white/5 hover:border-[#3713ec]/40 hover:shadow-[#3713ec]/20"
+        }`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onClick={() => router.push(`/watch/${id}`)}
     >
-      <div className="aspect-video w-full relative bg-black">
+      <div className="aspect-video w-full relative bg-black overflow-hidden">
+        {/* Privacy Label (More Prominent) */}
+
+
+        {/* Private Overlay Tint */}
+        {isPrivate && (
+          <div className="absolute inset-0 z-20 bg-amber-900/10 mix-blend-overlay pointer-events-none" />
+        )}
+
+        {/* Processing Badge */}
+        {(status === "TRANSCODING" || status === "PENDING") && (
+          <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center p-4 text-center">
+            <div className="w-12 h-12 rounded-xl bg-[#3713ec]/20 flex items-center justify-center mb-3 border border-[#3713ec]/30 shadow-[0_0_20px_rgba(55,19,236,0.3)] animate-pulse">
+              <span className="material-symbols-outlined text-[#3713ec] text-2xl animate-spin-slow">settings</span>
+            </div>
+            <p className="text-white text-sm font-black uppercase tracking-widest animate-pulse">Processing</p>
+            <p className="text-[10px] text-slate-400 mt-1 font-medium">Transcoding to HLS...</p>
+          </div>
+        )}
+
+        {/* Owned Badge (Toggle Button) */}
+        {isOwner && (
+          <button
+            type="button"
+            className={`absolute top-3 right-3 z-30 w-8 h-8 backdrop-blur-md rounded-xl flex items-center justify-center transition-all group/btn shadow-xl border border-white/10 ${isPrivate ? "bg-amber-500/20 hover:bg-amber-500/30 text-amber-500" : "bg-white/10 hover:bg-white/20 text-white"
+              }`}
+            onClick={handleToggleVisibility}
+            disabled={isToggling}
+            title={isPrivate ? "Make Public" : "Make Private"}>
+            <span className={`material-symbols-outlined text-lg ${isPrivate ? "text-amber-500" : "text-white group-hover/btn:text-[#3713ec]"}`}>
+              {isPrivate ? "lock" : "lock_open"}
+            </span>
+          </button>
+        )}
+
         <img
-          src={thumbnail}
-          alt={title}
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-            isHovering ? "opacity-0" : "opacity-100"
-          }`}
+          src={getMediaUrl(thumbnail)}
+          alt=""
+          className={`absolute inset-0 w-full h-full object-cover ${isHovering ? "opacity-0" : "opacity-100"
+            }`}
         />
 
         <video
@@ -87,21 +177,30 @@ export const VideoCard = ({ title, hlsUrl, thumbnail }: VideoCardProps) => {
           muted
           loop
           playsInline
-          className={`w-full h-full object-cover transition-opacity duration-500 ${
-            isHovering ? "opacity-100" : "opacity-0"
-          }`}
+          className={`absolute inset-0 w-full h-full object-cover ${isHovering ? "opacity-100" : "opacity-0"
+            }`}
         />
       </div>
 
-      <div className="p-3">
-        <h3 className="text-sm font-semibold text-slate-200 truncate group-hover:text-white transition-colors">
+      <div className="p-4 bg-gradient-to-b from-transparent to-black/20">
+        <h3 className="text-base font-bold text-slate-100 truncate group-hover:text-white transition-colors mb-2">
           {title}
         </h3>
-        <div className="flex items-center gap-2 mt-1">
-          <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-[#3713ec] to-purple-500" />
-          <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">
-            Playbbit Original
-          </span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className={`w-6 h-6 rounded-lg bg-gradient-to-tr flex items-center justify-center ${isPrivate ? "from-amber-500 to-orange-600" : "from-[#3713ec] to-purple-600"}`}>
+              <span className="material-symbols-outlined text-[12px] text-white">play_arrow</span>
+            </div>
+            <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest truncate max-w-[100px]">
+              {isOwner ? "Your Video" : "Community"}
+            </span>
+          </div>
+
+          <div className="flex -space-x-2">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="w-5 h-5 rounded-full border-2 border-[#0a0a0c] bg-white/5" />
+            ))}
+          </div>
         </div>
       </div>
     </div>
