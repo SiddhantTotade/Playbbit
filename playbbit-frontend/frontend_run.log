@@ -1,0 +1,75 @@
+nohup: ignoring input
+
+> playbbit-frontend@0.1.0 dev
+> next dev
+
+⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /home/siddhanttotade/package-lock.json as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+ Detected additional lockfiles: 
+   * /home/siddhanttotade/Backup/Playbbit/playbbit-frontend/package-lock.json
+
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.39:3000
+- Environments: .env.local, .env
+
+✓ Starting...
+✓ Ready in 1473ms
+ GET /watch/7e7de1bc-657d-4df5-8661-7f127c6bf5a5 200 in 2.3s (compile: 1715ms, render: 547ms)
+ GET /watch/7e7de1bc-657d-4df5-8661-7f127c6bf5a5 200 in 2.3s (compile: 1697ms, render: 575ms)
+ GET /watch/73e0bf40-5684-4a25-a77a-c5a76e1144d5 200 in 2.3s (compile: 1699ms, render: 583ms)
+ GET /api/auth/session 200 in 919ms (compile: 884ms, render: 34ms)
+ GET /api/auth/session 200 in 910ms (compile: 864ms, render: 46ms)
+ GET /api/auth/session 200 in 51ms (compile: 38ms, render: 12ms)
+ GET /api/auth/session 200 in 16ms (compile: 3ms, render: 13ms)
+ GET /api/auth/session 200 in 67ms (compile: 48ms, render: 19ms)
+ GET /api/auth/session 200 in 24ms (compile: 5ms, render: 19ms)
+ GET /api/auth/session 200 in 18ms (compile: 5ms, render: 14ms)
+ GET /api/auth/session 200 in 18ms (compile: 4ms, render: 14ms)
+ GET / 200 in 150ms (compile: 91ms, render: 59ms)
+ GET /video/create 200 in 114ms (compile: 64ms, render: 49ms)
+ GET / 200 in 25ms (compile: 6ms, render: 19ms)
+ GET /watch/77e9530b-6dd4-417e-b5d2-e3b38711e078 200 in 85ms (compile: 51ms, render: 34ms)
+ GET /api/auth/session 200 in 50ms (compile: 36ms, render: 14ms)
+ GET /api/auth/session 200 in 28ms (compile: 7ms, render: 20ms)
+ GET /watch/77e9530b-6dd4-417e-b5d2-e3b38711e078 200 in 128ms (compile: 52ms, render: 76ms)
+ GET /api/auth/session 200 in 53ms (compile: 39ms, render: 13ms)
+ GET /api/auth/session 200 in 20ms (compile: 3ms, render: 17ms)
+ GET / 200 in 29ms (compile: 4ms, render: 25ms)
+ GET /video/create 200 in 35ms (compile: 3ms, render: 32ms)
+ GET / 200 in 23ms (compile: 3ms, render: 20ms)
+ GET /watch/bad37b37-2df8-42fb-8bdf-cb64343728c2 200 in 75ms (compile: 45ms, render: 30ms)
+✓ Compiled in 105ms
+✓ Compiled in 82ms
+ GET / 200 in 135ms (compile: 8ms, render: 127ms)
+ GET /api/auth/session 200 in 90ms (compile: 72ms, render: 18ms)
+ GET /watch/bad37b37-2df8-42fb-8bdf-cb64343728c2 200 in 440ms (compile: 253ms, render: 186ms)
+✓ Compiled in 344ms
+ GET /watch/bad37b37-2df8-42fb-8bdf-cb64343728c2 200 in 603ms (compile: 160ms, render: 443ms)
+ GET /api/auth/session 200 in 60ms (compile: 44ms, render: 16ms)
+ GET /api/auth/session 200 in 33ms (compile: 6ms, render: 26ms)
+✓ Compiled in 98ms
+ GET /watch/bad37b37-2df8-42fb-8bdf-cb64343728c2 200 in 608ms (compile: 158ms, render: 450ms)
+ GET /api/auth/session 200 in 60ms (compile: 43ms, render: 17ms)
+ GET /api/auth/session 200 in 18ms (compile: 5ms, render: 13ms)
+ GET /video/create 200 in 45ms (compile: 6ms, render: 39ms)
+ GET / 200 in 30ms (compile: 6ms, render: 25ms)
+ GET /watch/ce314845-4f3e-4dc6-834c-68ad9e2f41ac 200 in 97ms (compile: 58ms, render: 40ms)
+ GET /api/auth/session 200 in 71ms (compile: 56ms, render: 15ms)
+ GET /api/auth/session 200 in 22ms (compile: 3ms, render: 19ms)
+ GET /api/auth/session 200 in 56ms (compile: 44ms, render: 12ms)
+ GET /api/auth/session 200 in 22ms (compile: 6ms, render: 15ms)
+ GET / 200 in 33ms (compile: 5ms, render: 29ms)
+ GET /video/create 200 in 37ms (compile: 4ms, render: 33ms)
+ GET /api/auth/session 200 in 132ms (compile: 104ms, render: 28ms)
+ GET /api/auth/session 200 in 34ms (compile: 13ms, render: 22ms)
+ GET / 200 in 102ms (compile: 11ms, render: 91ms)
+ GET / 200 in 163ms (compile: 15ms, render: 148ms)
+ GET /api/auth/session 200 in 131ms (compile: 112ms, render: 19ms)
+ GET /api/auth/session 200 in 29ms (compile: 5ms, render: 24ms)
+ GET /api/auth/session 200 in 143ms (compile: 114ms, render: 29ms)
+ GET /api/auth/session 200 in 62ms (compile: 15ms, render: 47ms)
+ GET /api/auth/session 200 in 100ms (compile: 73ms, render: 27ms)
+ GET /api/auth/session 200 in 106ms (compile: 23ms, render: 83ms)

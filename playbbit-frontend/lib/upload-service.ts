@@ -29,6 +29,7 @@ export const uploadResumableVideo = async (
   uploadId: string,
   onProgress: (percent: number) => void,
   thumbnailUrl?: string,
+  description?: string,
 ) => {
   console.log(`Checking upload status at ${API_BASE}/upload/status...`);
   const statusRes = await fetch(
@@ -59,6 +60,7 @@ export const uploadResumableVideo = async (
     formData.append("title", title);
     formData.append("isPrivate", isPrivate.toString());
     if (thumbnailUrl) formData.append("thumbnailUrl", thumbnailUrl);
+    if (description) formData.append("description", description);
 
     const res = await fetch(`${API_BASE}/upload/chunk`, {
       method: "POST",
@@ -96,4 +98,19 @@ export const toggleVideoVisibility = async (id: string, token: string) => {
   }
 
   return await res.json();
+};
+
+export const deleteVideo = async (id: string, token: string) => {
+  const res = await fetch(`${API_BASE}/videos/${id}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to delete video: ${res.status} ${res.statusText}`);
+  }
+
+  return true;
 };

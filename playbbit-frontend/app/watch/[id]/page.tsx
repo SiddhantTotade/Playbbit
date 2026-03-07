@@ -85,6 +85,36 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
     );
   }
 
+  if (video?.status === "FAILED") {
+    return (
+      <MainLayout>
+        <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
+          <div className="w-24 h-24 bg-red-500/10 rounded-full flex items-center justify-center mb-6 border border-red-500/20 shadow-[0_0_30px_rgba(239,68,68,0.1)]">
+            <span className="material-symbols-outlined text-red-500 text-5xl">error</span>
+          </div>
+          <h1 className="text-4xl font-black text-white mb-4 tracking-tight">Transcoding Failed <span className="text-red-500">.</span></h1>
+          <p className="text-slate-400 max-w-md mx-auto mb-10 text-lg">
+            We encountered an error while processing this video. Please try uploading it again or contact support if the issue persists.
+          </p>
+          <div className="flex gap-4">
+            <button
+              onClick={() => window.location.href = "/"}
+              className="px-8 py-3 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-bold transition-all border border-white/10"
+            >
+              Back to Home
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-8 py-3 bg-red-500 hover:bg-red-600 text-white rounded-2xl font-bold transition-all shadow-lg shadow-red-500/20"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
   if (!video) return null;
 
   return (

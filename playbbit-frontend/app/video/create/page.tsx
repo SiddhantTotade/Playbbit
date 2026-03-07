@@ -16,6 +16,7 @@ export default function CreateVideoPage() {
   const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
 
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -79,7 +80,8 @@ export default function CreateVideoPage() {
             setStatusMsg("Upload successful! Your video is now being transcoded.");
           }
         },
-        thumbnailUrl
+        thumbnailUrl,
+        description
       );
 
       // Start polling for transcoding status instead of immediate redirect
@@ -168,7 +170,7 @@ export default function CreateVideoPage() {
 
                 {file ? (
                   <div className="animate-in fade-in slide-in-from-bottom-2">
-                    <h3 className="text-xl font-bold text-white mb-1 line-clamp-1 px-4">{file.name}</h3>
+                    <h3 className="text-xl font-bold text-white mb-1">File Selected</h3>
                     <p className="text-[#3713ec] text-sm font-medium">Ready to hop!</p>
                   </div>
                 ) : (
@@ -192,6 +194,15 @@ export default function CreateVideoPage() {
               </h3>
 
               <div className="space-y-4">
+                {file && (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-500">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Selected File</label>
+                    <div className="w-full bg-black/20 border border-white/5 rounded-2xl px-5 py-3 text-slate-400 text-sm font-mono break-all line-clamp-2">
+                      {file.name}
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Title</label>
                   <input
@@ -201,6 +212,17 @@ export default function CreateVideoPage() {
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Give your video a catchy title..."
                     required
+                    disabled={loading}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Description</label>
+                  <textarea
+                    className="w-full bg-black/40 border border-white/5 rounded-2xl px-5 py-4 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-[#3713ec]/50 outline-none transition-all min-h-[120px] resize-none"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Tell your viewers more about this video..."
                     disabled={loading}
                   />
                 </div>

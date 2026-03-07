@@ -69,6 +69,11 @@ export default function DashboardPage() {
     }
   }, [status, session]);
 
+  const handleDeleteVideo = (videoId: string) => {
+    setPublicVideos(prev => prev.filter(v => v.id !== videoId));
+    setMyVideos(prev => prev.filter(v => v.id !== videoId));
+  };
+
   // Handle loading state for the session check
   if (status === "loading") {
     return (
@@ -151,6 +156,7 @@ export default function DashboardPage() {
                   isPrivate={video.isPrivate}
                   isOwner={true}
                   status={video.status}
+                  onDeleted={() => handleDeleteVideo(video.id)}
                 />
               ))}
             </div>
@@ -198,6 +204,7 @@ export default function DashboardPage() {
                 isPrivate={video.isPrivate}
                 isOwner={status === "authenticated" && session?.user?.email?.toLowerCase() === video.userId?.toLowerCase()}
                 status={video.status}
+                onDeleted={() => handleDeleteVideo(video.id)}
               />
             ))}
           </div>
