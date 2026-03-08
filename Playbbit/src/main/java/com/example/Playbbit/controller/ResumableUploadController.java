@@ -59,6 +59,7 @@ public class ResumableUploadController {
             @RequestParam("chunk") MultipartFile chunk,
             @RequestParam("uploadId") String uploadId,
             @RequestParam("totalSize") long totalSize,
+            @RequestParam(value = "description", required = false) String description,
             @RequestParam("fileName") String fileName) throws Exception {
 
         String userId = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -82,7 +83,14 @@ public class ResumableUploadController {
             uploadLocks.remove(uploadId);
             File finalFile = new File(UPLOAD_DIR + uploadId + "_" + fileName);
             File fileToProcess = partFile.renameTo(finalFile) ? finalFile : partFile;
-            transcodingService.processUploadAsync(fileToProcess, fileName, uploadId, userId, title, isPrivate,
+
+            // 1. Create the video record synchronously so the database row is committed
+            // and visible to the frontend's polling before the async process starts.
+            transcodingService.createInitialVideoRecord(uploadId, title, description, userId, isPrivate, thumbnailUrl);
+
+            // 2. Start the heavy transcoding process asynchronously.
+            transcodingService.processUploadAsync(fileToProcess, fileName, uploadId, userId, title, description,
+                    isPrivate,
                     thumbnailUrl);
             return ResponseEntity.ok("COMPLETE");
         }

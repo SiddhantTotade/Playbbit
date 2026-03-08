@@ -26,6 +26,7 @@ public class Video {
     private String id;
 
     private String title;
+    @jakarta.persistence.Column(length = 2000)
     private String description;
     private String userId;
     private String userName;

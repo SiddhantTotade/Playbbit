@@ -16,6 +16,7 @@ import com.example.Playbbit.entity.StreamEntity;
 import com.example.Playbbit.entity.Video;
 import com.example.Playbbit.repository.StreamRepository;
 import com.example.Playbbit.repository.VideoRepository;
+import com.example.Playbbit.service.S3UploadService;
 import com.example.Playbbit.service.VideoLinkService;
 
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class VideoController {
     private final StreamRepository streamRepository;
     private final VideoRepository videoRepository;
     private final VideoLinkService videoLinkService;
+    private final S3UploadService s3UploadService;
 
     /** Public feed of all published videos (used by homepage) */
     @GetMapping("/feed")
@@ -38,16 +40,20 @@ public class VideoController {
     /** Get a single video by ID (used by the watch page) */
     @GetMapping("/{id}")
     public ResponseEntity<Video> getVideoById(@PathVariable String id) {
+        System.out.println("GET /api/videos/" + id + " called");
         Optional<Video> videoOpt = videoRepository.findById(id);
         if (videoOpt.isEmpty()) {
+            System.out.println("Video with id " + id + " not found in database.");
             return ResponseEntity.notFound().build();
         }
 
         Video video = videoOpt.get();
+        System.out.println("Video found: " + video.getTitle() + " (Status: " + video.getStatus() + ")");
         if (video.isPrivate()) {
             String currentUser = SecurityContextHolder.getContext().getAuthentication().getName();
             String owner = video.getUserId();
             if (currentUser == null || owner == null || !owner.trim().equalsIgnoreCase(currentUser.trim())) {
+                System.out.println("Access denied for user " + currentUser + " to private video " + id);
                 return ResponseEntity.status(403).build();
             }
         }
@@ -75,6 +81,23 @@ public class VideoController {
         if (videoOwner == null || !videoOwner.trim().equalsIgnoreCase(email.trim())) {
             return ResponseEntity.status(403).build();
         }
+
+        // Cleanup S3 assets
+        String prefix = "uploads/" + videoOwner + "/" + id + "/";
+        try {
+            s3UploadService.deleteFolder(prefix);
+
+            // Delete thumbnail if it exists
+            String thumbUrl = video.getThumbnailUrl();
+            if (thumbUrl != null && !thumbUrl.isEmpty()) {
+                // If it's a relative path like /thumbnails/..., strip leading slash for S3 key
+                String thumbKey = thumbUrl.startsWith("/") ? thumbUrl.substring(1) : thumbUrl;
+                s3UploadService.deleteFolder(thumbKey);
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to cleanup S3 assets for video " + id + ": " + e.getMessage());
+        }
+
         videoRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }

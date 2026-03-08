@@ -2,6 +2,7 @@ package com.example.Playbbit.service;
 
 import java.io.File;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -13,6 +14,9 @@ import lombok.RequiredArgsConstructor;
 public class TranscodeWorker {
     private final StringRedisTemplate redisTemplate;
     private final S3UploadService s3UploadService;
+
+    @Value("${app.stream.ingest-base-url}")
+    private String ingestBaseUrl;
 
     @Scheduled(fixedDelay = 1000)
     public void pollJobs() {
@@ -30,10 +34,13 @@ public class TranscodeWorker {
 
         ProcessBuilder pb = new ProcessBuilder(
                 "ffmpeg",
-                "-i", "rtmp://infra-ingest-1/live/" + streamKey,
+                "-i", ingestBaseUrl + "/" + streamKey,
                 "-c:v", "libx264", "-preset", "veryfast",
+                "-profile:v", "main", "-level:v", "3.1",
+                "-pix_fmt", "yuv420p",
                 "-c:a", "aac", "-b:a", "128k",
                 "-f", "hls",
+                "-hls_flags", "independent_segments",
                 "-hls_time", "4",
                 "-hls_list_size", "0",
                 "-hls_playlist_type", "event",
