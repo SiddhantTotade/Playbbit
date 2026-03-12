@@ -45,6 +45,8 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.GET, "/api/videos/feed").permitAll()
                                                 .requestMatchers(HttpMethod.GET, "/api/videos/live/public").permitAll()
                                                 .requestMatchers(HttpMethod.GET, "/api/videos/*").permitAll()
+                                                .requestMatchers("/api/live/**").permitAll()
+                                                .requestMatchers("/validate", "/done").permitAll()
                                                 // 2. Ensure the upload path is authenticated
                                                 .requestMatchers("/api/upload/**").authenticated()
                                                 .anyRequest().authenticated())

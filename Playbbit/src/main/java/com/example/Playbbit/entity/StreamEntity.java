@@ -11,6 +11,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import lombok.Data;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 @Entity
 @Data
 public class StreamEntity {
@@ -33,6 +35,9 @@ public class StreamEntity {
 
     @Enumerated(EnumType.STRING)
     private Visibility visibility = Visibility.PUBLIC;
+
+    @JsonIgnore
+    private String accessPin;
 
     private String manifestUrl;
 }

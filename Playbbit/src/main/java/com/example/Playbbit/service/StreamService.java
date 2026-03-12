@@ -1,37 +1,43 @@
 package com.example.Playbbit.service;
 
+import com.example.Playbbit.util.PathUtils;
+
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import com.example.Playbbit.entity.StreamStatus;
 import com.example.Playbbit.repository.StreamRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import jakarta.transaction.Transactional;
 
 @Service
+@Slf4j
+@RequiredArgsConstructor
 public class StreamService {
     private final StreamRepository repository;
     private final StringRedisTemplate redisTemplate;
-
-    public StreamService(StreamRepository repository, StringRedisTemplate redisTemplate) {
-        this.repository = repository;
-        this.redisTemplate = redisTemplate;
-    }
 
     @Transactional
     public boolean startStream(String streamKey) {
         return repository.findByStreamKey(streamKey).map(stream -> {
             stream.setStatus(StreamStatus.LIVE);
+            // Consistent manifest URL pointing to our proxy
+            stream.setManifestUrl("/api/live/proxy/" + stream.getId() + "/index.m3u8");
             repository.save(stream);
 
-            String jobPayload = "{\"streamId\":\"" + stream.getId() + "\", \"key\":\"" + streamKey + "\"}";
-            redisTemplate.opsForList().leftPush("transcode_jobs", jobPayload);
-            System.out.println("Job pushed to Redis for key: " + streamKey);
+            String userId = stream.getUserId();
+            String jobPayload = String.format(
+                    "{\"streamId\":\"%s\", \"key\":\"%s\", \"userId\":\"%s\"}",
+                    stream.getId(), streamKey, userId);
+
+            redisTemplate.opsForList().leftPush("transcode_jobs_v2", jobPayload);
+            log.info("Job pushed to Redis for key: {} with payload: {}", streamKey, jobPayload);
             return true;
         }).orElseGet(() -> {
-            System.out.println("Stream key not found: " + streamKey);
+            log.error("Stream key not found: {}", streamKey);
             return false;
-
         });
     }
 

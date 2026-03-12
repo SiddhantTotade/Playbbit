@@ -124,8 +124,12 @@ public class VideoController {
     public List<StreamEntity> getPublicLiveStreams() {
         List<StreamEntity> streams = streamRepository.findAll();
         for (StreamEntity stream : streams) {
-            String secureUrl = videoLinkService.getAccessUrl(stream);
-            stream.setManifestUrl(secureUrl);
+            if (stream.getVisibility() != com.example.Playbbit.entity.Visibility.PRIVATE) {
+                String secureUrl = videoLinkService.getAccessUrl(stream);
+                stream.setManifestUrl(secureUrl);
+            } else {
+                stream.setManifestUrl(null);
+            }
         }
         return streams;
     }

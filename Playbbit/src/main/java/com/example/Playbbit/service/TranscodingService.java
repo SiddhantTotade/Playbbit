@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.Playbbit.config.MinioProperties;
 import com.example.Playbbit.entity.Video;
 import com.example.Playbbit.repository.VideoRepository;
+import com.example.Playbbit.util.PathUtils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -216,13 +217,13 @@ public class TranscodingService {
                 File[] files = outputFolder.listFiles();
                 if (files != null) {
                     for (File f : files) {
-                        String minioPath = "uploads/" + userId + "/" + uploadId + "/" + f.getName();
+                        String minioPath = PathUtils.getS3UploadPath(userId, uploadId) + "/" + f.getName();
                         s3UploadService.uploadChunk(f, minioPath);
                     }
                 }
 
                 video.setStatus(Video.VideoStatus.PUBLISHED);
-                String hlsPath = "/uploads/" + userId + "/" + uploadId + "/master.m3u8";
+                String hlsPath = "/api/live/proxy/" + uploadId + "/master.m3u8";
                 video.setHlsUrl(hlsPath);
 
                 videoRepository.save(video);

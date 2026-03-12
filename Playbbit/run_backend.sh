@@ -13,9 +13,9 @@ export JWT_SECRET="HQU/Hm4/QO2gDvGAcwrX7+DaSnygKHEMuWQoEtDpOd4="
 # Override datasource URL to localhost for local execution
 export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/playbbit_db"
 
-echo "Stopping any running backend on port 8085..."
-fuser -k 8085/tcp || true
+echo "Stopping any running backend on port 8080..."
+fuser -k 8080/tcp || true
 
-echo "Starting backend on port 8085..."
-nohup ./mvnw spring-boot:run -Dspring-boot.run.arguments=--server.port=8085 > backend_run.log 2>&1 &
-echo "Backend started in background on 8085. Check backend_run.log for status."
+echo "Starting backend on port 8082..."
+nohup ./mvnw -e spring-boot:run -Dspring-boot.run.arguments=--server.port=8082 > backend_run.log 2>&1 &
+echo "Backend started in background on 8082. Check backend_run.log for status."

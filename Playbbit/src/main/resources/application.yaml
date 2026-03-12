@@ -39,4 +39,4 @@ app:
   jwt:
     secret: ${JWT_SECRET}
   stream:
-    ingest-base-url: "rtmp://ingest/live"
+    ingest-base-url: "rtmp://localhost:1935/live"

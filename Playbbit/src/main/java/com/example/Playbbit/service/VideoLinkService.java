@@ -13,25 +13,15 @@ import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignReques
 
 @Service
 public class VideoLinkService {
+    private final S3Presigner s3Presigner;
     private final MinioProperties minioProperties;
 
-    public VideoLinkService(MinioProperties minioProperties) {
+    public VideoLinkService(S3Presigner s3Presigner, MinioProperties minioProperties) {
+        this.s3Presigner = s3Presigner;
         this.minioProperties = minioProperties;
     }
 
     public String getAccessUrl(StreamEntity video) {
-        if (video.getVisibility() == Visibility.PUBLIC) {
-            return video.getManifestUrl();
-        }
-
-        try (S3Presigner presigner = S3Presigner.create()) {
-            GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
-                    .signatureDuration(Duration.ofHours(1))
-                    .getObjectRequest(b -> b.bucket(minioProperties.getBucket())
-                            .key("uploads/" + video.getStreamKey()))
-                    .build();
-
-            return presigner.presignGetObject(presignRequest).url().toString();
-        }
+        return video.getManifestUrl();
     }
 }

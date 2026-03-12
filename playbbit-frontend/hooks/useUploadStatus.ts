@@ -8,7 +8,8 @@ export const useUploadStatus = (uploadId: string | null) => {
   useEffect(() => {
     if (!uploadId) return;
 
-    const socket = new SockJS("http://localhost:8080/ws-video-status");
+    const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8082/api";
+    const socket = new SockJS("http://localhost:8082/ws-video-status");
     const client = new Client({
       webSocketFactory: () => socket,
       debug: (str) => console.log(str),

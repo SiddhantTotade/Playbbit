@@ -12,6 +12,8 @@ services:
       - "8080:8080"
     networks:
       - playbbit-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 networks:
   playbbit-network:

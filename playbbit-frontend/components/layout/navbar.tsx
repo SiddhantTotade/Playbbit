@@ -28,6 +28,12 @@ export function Navbar() {
                                 Feed
                             </Link>
                             <Link
+                                href="/live"
+                                className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                            >
+                                Live Streams
+                            </Link>
+                            <Link
                                 href="/video/create"
                                 className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all"
                             >

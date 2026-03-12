@@ -17,13 +17,13 @@ export const getMediaUrl = (path: string | null | undefined): string => {
         return result;
     }
 
-    // 2. If it's a relative path
-    let cleanPath = path.startsWith("/") ? path.substring(1) : path;
-
-    // Fix double bucket in relative path as well
-    if (cleanPath.startsWith("live-streams/live-streams/")) {
-        cleanPath = cleanPath.substring("live-streams/".length);
+    // 2. If it's a relative path (e.g. /uploads/... or /api/live/proxy/...)
+    if (path.startsWith("/api/live/proxy/")) {
+        // Return as is (relative to frontend host)
+        return path;
     }
+
+    let cleanPath = path.startsWith("/") ? path.substring(1) : path;
 
     // Standard bucket prefix removal for construction
     if (cleanPath.startsWith("live-streams/")) {

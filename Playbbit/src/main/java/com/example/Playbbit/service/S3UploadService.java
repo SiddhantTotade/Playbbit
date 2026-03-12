@@ -24,23 +24,27 @@ public class S3UploadService {
     }
 
     public void uploadChunk(File file, String s3Path) {
-        String contentType = "video/MP2T";
-        if (file.getName().endsWith(".m3u8")) {
-            contentType = "application/x-mpegURL";
-        } else if (file.getName().endsWith(".vtt")) {
-            contentType = "text/vtt";
-        }
+        try {
+            String contentType = "video/MP2T";
+            if (file.getName().endsWith(".m3u8")) {
+                contentType = "application/x-mpegURL";
+            } else if (file.getName().endsWith(".vtt")) {
+                contentType = "text/vtt";
+            }
 
-        s3Client.putObject(
-                PutObjectRequest.builder()
-                        .bucket(minioProperties.getBucket())
-                        .key(s3Path)
-                        .contentType(contentType)
-                        .build(),
-                RequestBody.fromFile(file));
+            s3Client.putObject(
+                    PutObjectRequest.builder()
+                            .bucket(minioProperties.getBucket())
+                            .key(s3Path)
+                            .contentType(contentType)
+                            .build(),
+                    RequestBody.fromFile(file));
 
-        if (file.getName().endsWith(".ts")) {
-            file.delete();
+            if (file.getName().endsWith(".ts") && file.exists()) {
+                file.delete();
+            }
+        } catch (Exception e) {
+            System.err.println(">>> S3 UPLOAD FAILED for " + s3Path + ": " + e.getMessage());
         }
     }
 

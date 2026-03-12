@@ -1,5 +1,7 @@
 package com.example.Playbbit.config;
 
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
+
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,6 +50,23 @@ public class MinioInitializer {
                     .policy(policy)
                     .build());
             log.info("Public read policy applied to bucket '{}'.", bucket);
+            // Verify bucket contents for debugging
+            try {
+                ListObjectsV2Response listResponse = s3Client
+                        .listObjectsV2(software.amazon.awssdk.services.s3.model.ListObjectsV2Request.builder()
+                                .bucket(bucket)
+                                .maxKeys(10)
+                                .build());
+                if (listResponse.hasContents()) {
+                    log.info("Bucket '{}' contains {} objects (showing up to 10):", bucket,
+                            listResponse.contents().size());
+                    listResponse.contents().forEach(obj -> log.info(" - {}", obj.key()));
+                } else {
+                    log.info("Bucket '{}' is currently empty.", bucket);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to list objects in bucket '{}': {}", bucket, e.getMessage());
+            }
 
         } catch (Exception e) {
             log.error("Failed to initialize MinIO bucket policy: {}", e.getMessage(), e);

@@ -11,7 +11,7 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
   const [video, setVideo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [restrictedAccess, setRestrictedAccess] = useState(false);
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api";
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8082/api";
 
   const checkAccess = async () => {
     try {

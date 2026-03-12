@@ -19,6 +19,11 @@ spring:
 
 minio:
   endpoint: http://minio:9000
-  access-key: ${MINIO_ACCESS_KEY}
-  secret-key: ${MINIO_SECRET_KEY}
+  accessKey: ${MINIO_ACCESS_KEY}
+  secretKey: ${MINIO_SECRET_KEY}
   region: ${MINIO_REGION:us-east-1}
+  bucket: live-streams
+
+app:
+  stream:
+    ingest-base-url: "rtmp://ingest:1935/live"
