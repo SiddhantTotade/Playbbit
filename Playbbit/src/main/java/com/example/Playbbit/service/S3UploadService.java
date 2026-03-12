@@ -12,8 +12,10 @@ import software.amazon.awssdk.services.s3.model.*;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
+@Slf4j
 public class S3UploadService {
     private final S3Client s3Client;
     private final MinioProperties minioProperties;
@@ -39,12 +41,15 @@ public class S3UploadService {
                             .contentType(contentType)
                             .build(),
                     RequestBody.fromFile(file));
+            log.info(">>> S3 UPLOAD SUCCESS for {} in bucket {}", s3Path, minioProperties.getBucket());
 
-            if (file.getName().endsWith(".ts") && file.exists()) {
-                file.delete();
-            }
+            // Commented out to allow serving from local disk during live stream
+            // if (file.getName().endsWith(".ts") && file.exists()) {
+            // file.delete();
+            // }
         } catch (Exception e) {
-            System.err.println(">>> S3 UPLOAD FAILED for " + s3Path + ": " + e.getMessage());
+            log.error(">>> S3 UPLOAD FAILED for {}: {} bucket: {}", s3Path, e.getMessage(),
+                    minioProperties.getBucket());
         }
     }
 

@@ -22,6 +22,22 @@ public class StreamService {
     @Transactional
     public boolean startStream(String streamKey) {
         return repository.findByStreamKey(streamKey).map(stream -> {
+            String lockKey = "stream_lock:" + streamKey;
+            Boolean isLocked = redisTemplate.opsForValue().setIfAbsent(lockKey, "locked",
+                    java.time.Duration.ofMinutes(1));
+
+            if (isLocked == null || !isLocked) {
+                log.info("Stream {} is already being processed (lock exists), skipping", streamKey);
+                return true;
+            }
+            log.info("Stream {} lock ACQUIRED for processing", streamKey);
+
+            if (stream.getStatus() == StreamStatus.LIVE) {
+                log.info("Stream {} is already LIVE in DB, skipping job push", streamKey);
+                // We keep the lock for a while to prevent race conditions during state
+                // transition
+                return true;
+            }
             stream.setStatus(StreamStatus.LIVE);
             // Consistent manifest URL pointing to our proxy
             stream.setManifestUrl("/api/live/proxy/" + stream.getId() + "/index.m3u8");

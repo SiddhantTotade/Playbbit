@@ -27,7 +27,7 @@ public class TranscodeWorker {
     public void pollJobs() {
         String jobJson = redisTemplate.opsForList().rightPop("transcode_jobs_v2");
         if (jobJson != null) {
-            System.out.println(">>> WORKER FOUND JOB: " + jobJson);
+            log.info(">>> WORKER FOUND JOB: {}", jobJson);
             processVideo(jobJson);
         }
     }
@@ -38,27 +38,35 @@ public class TranscodeWorker {
         if (streamKey == null)
             streamKey = extractFromJson(json, "streamKey"); // fallback
         String userId = extractFromJson(json, "userId");
-        String s3SubPath = PathUtils.getS3UploadPath(userId, streamId);
+        String s3SubPath = PathUtils.getS3UploadPath(PathUtils.LIVE_STREAMS_FOLDER, userId, streamId);
         String subPath = PathUtils.sanitizeUserId(userId) + "/" + streamId;
         String outputDir = "/tmp/hls/" + subPath;
-        new File(outputDir).mkdirs();
-
-        log.info(">>> STARTING FFMPEG for subPath: {}", subPath);
+        File outDirFile = new File(outputDir);
+        boolean created = outDirFile.mkdirs();
+        log.info(">>> Output Dir: {}, Created: {}, Exists: {}, Writable: {}",
+                outputDir, created, outDirFile.exists(), outDirFile.canWrite());
         log.info(">>> S3 Path (prefix): {}", s3SubPath);
         log.info(">>> S3 Bucket: {}", minioProperties.getBucket());
         log.info(">>> Input URL: {}/{}", ingestBaseUrl, streamKey);
 
         ProcessBuilder pb = new ProcessBuilder(
                 "ffmpeg",
+                "-analyzeduration", "10M",
+                "-probesize", "10M",
                 "-i", ingestBaseUrl + "/" + streamKey,
+                "-map", "0:v?", "-map", "0:a?",
                 "-c:v", "libx264", "-preset", "veryfast",
-                "-profile:v", "main", "-level:v", "3.1",
+                "-tune", "zerolatency",
+                "-profile:v", "main", "-level:v", "4.1",
                 "-pix_fmt", "yuv420p",
-                "-c:a", "aac", "-b:a", "128k",
+                "-g", "60", "-bf", "0", "-sc_threshold", "0",
+                "-c:a", "aac", "-b:a", "128k", "-ac", "2",
+                "-ar", "44100",
+                "-af", "aresample=async=1",
                 "-f", "hls",
                 "-hls_flags", "independent_segments",
                 "-hls_time", "4",
-                "-hls_list_size", "0",
+                "-hls_list_size", "6",
                 "-hls_playlist_type", "event",
                 outputDir + "/index.m3u8");
 
@@ -92,11 +100,18 @@ public class TranscodeWorker {
                         Thread.sleep(2000);
                     }
 
-                    log.info(">>> FFMPEG PROCESS ENDED for: {}. Exit code: {}", streamId, process.exitValue());
+                    int exitCode = process.waitFor();
+                    log.info(">>> FFMPEG PROCESS ENDED for: {}. Exit code: {}", streamId, exitCode);
                     Thread.sleep(3000);
 
                     uploadExistingFiles(folder, s3SubPath, uploadedFiles);
-                    log.info(">>> VOD COMPLETE: {} finalize finished.", streamId);
+                    log.info(">>> VOD COMPLETE: {} finalize finished. Final file count: {}", streamId,
+                            uploadedFiles.size());
+
+                    // Clean up local files after some delay to ensure last proxy requests are
+                    // served
+                    Thread.sleep(10000);
+                    deleteLocalFolder(folder);
                 } catch (InterruptedException e) {
                     log.warn("Upload thread interrupted for {}", streamId);
                     Thread.currentThread().interrupt();
@@ -114,20 +129,51 @@ public class TranscodeWorker {
 
     private void uploadExistingFiles(File folder, String subPath, java.util.Set<String> uploadedFiles) {
         File[] files = folder.listFiles();
-        if (files != null) {
-            for (File f : files) {
-                if (f.isDirectory())
-                    continue;
-                String s3Path = subPath + "/" + f.getName();
-                if (f.getName().endsWith(".ts") && !uploadedFiles.contains(f.getName())) {
+        if (files == null) {
+            log.warn(">>> Directory listing failed for: {}", folder.getAbsolutePath());
+            return;
+        }
+        if (files.length == 0) {
+            log.info(">>> No files found in directory: {}", folder.getAbsolutePath());
+            return;
+        }
+        log.info(">>> Scan in {}: found {} files", folder.getName(), files.length);
+
+        for (File f : files) {
+            if (f.isDirectory())
+                continue;
+            String s3Path = subPath + "/" + f.getName();
+            if (f.getName().endsWith(".ts")) {
+                if (!uploadedFiles.contains(f.getName())) {
                     log.info(">>> UPLOADING CHUNK: {} to bucket: {}", s3Path, minioProperties.getBucket());
                     s3UploadService.uploadChunk(f, s3Path);
                     uploadedFiles.add(f.getName());
-                } else if (f.getName().endsWith(".m3u8")) {
-                    log.info(">>> UPLOADING MANIFEST: {} to bucket: {}", s3Path, minioProperties.getBucket());
-                    s3UploadService.uploadChunk(f, s3Path);
+                } else {
+                    log.debug(">>> Skipping already uploaded chunk: {}", f.getName());
+                }
+            } else if (f.getName().endsWith(".m3u8")) {
+                log.info(">>> UPLOADING MANIFEST: {} to bucket: {}", s3Path, minioProperties.getBucket());
+                s3UploadService.uploadChunk(f, s3Path);
+            } else {
+                log.info(">>> Found non-hls file: {}", f.getName());
+            }
+        }
+    }
+
+    private void deleteLocalFolder(File folder) {
+        if (folder.exists()) {
+            File[] files = folder.listFiles();
+            if (files != null) {
+                for (File f : files) {
+                    if (f.isDirectory()) {
+                        deleteLocalFolder(f);
+                    } else {
+                        f.delete();
+                    }
                 }
             }
+            folder.delete();
+            log.info(">>> CLEANED UP local HLS folder: {}", folder.getAbsolutePath());
         }
     }
 

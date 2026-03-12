@@ -29,7 +29,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchAllData = async () => {
       try {
-        const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8082/api";
+        const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api";
         const token = (session as any)?.accessToken;
 
         // 1. Fetch public feed (accessible to everyone)

@@ -217,7 +217,8 @@ public class TranscodingService {
                 File[] files = outputFolder.listFiles();
                 if (files != null) {
                     for (File f : files) {
-                        String minioPath = PathUtils.getS3UploadPath(userId, uploadId) + "/" + f.getName();
+                        String minioPath = PathUtils.getS3UploadPath(PathUtils.VIDEOS_FOLDER, userId, uploadId) + "/"
+                                + f.getName();
                         s3UploadService.uploadChunk(f, minioPath);
                     }
                 }

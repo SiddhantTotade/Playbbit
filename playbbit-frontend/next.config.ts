@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   images: {
@@ -7,6 +8,8 @@ const nextConfig: NextConfig = {
       { protocol: "http", hostname: "localhost" },
     ],
   },
+  // This tells Next.js to ignore the lockfile in your home directory
+  outputFileTracingRoot: path.join(__dirname, "./"),
 };
 
 export default nextConfig;

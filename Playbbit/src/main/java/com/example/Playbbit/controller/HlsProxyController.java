@@ -28,6 +28,9 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.security.Principal;
 import java.util.Optional;
 import java.util.UUID;
@@ -53,6 +56,7 @@ public class HlsProxyController {
 
         String userId = null;
         boolean isPrivate = false;
+        boolean isLive = false;
 
         // 1. Try finding in StreamRepository (Live)
         try {
@@ -62,6 +66,7 @@ public class HlsProxyController {
                 StreamEntity stream = streamOpt.get();
                 userId = stream.getUserId();
                 isPrivate = stream.getVisibility() == Visibility.PRIVATE;
+                isLive = true;
             }
         } catch (IllegalArgumentException e) {
             // Not a UUID, skip Live check
@@ -108,10 +113,27 @@ public class HlsProxyController {
             }
         }
 
-        // Construct S3 key using PathUtils
-        String s3Key = PathUtils.getS3UploadPath(userId, id) + "/" + filename;
+        // 1. Try serving from local disk first (for live streams)
+        String localSubPath = PathUtils.sanitizeUserId(userId) + "/" + id;
+        File localFile = new File("/tmp/hls/" + localSubPath + "/" + filename);
 
-        log.info("Proxying HLS request for stream: {}, file: {}, S3 key: {}", id, filename, s3Key);
+        if (localFile.exists() && localFile.isFile()) {
+            log.info("Serving HLS file LOCALLY for stream: {}, file: {}", id, filename);
+            try {
+                String contentType = getContentType(filename);
+                return ResponseEntity.ok()
+                        .header(HttpHeaders.CONTENT_TYPE, contentType)
+                        .body(new InputStreamResource(new FileInputStream(localFile)));
+            } catch (IOException e) {
+                log.error("Error reading local HLS file: {}", localFile.getAbsolutePath(), e);
+            }
+        }
+
+        // Determine S3 root folder
+        String rootFolder = isLive ? PathUtils.LIVE_STREAMS_FOLDER : PathUtils.VIDEOS_FOLDER;
+        String s3Key = PathUtils.getS3UploadPath(rootFolder, userId, id) + "/" + filename;
+
+        log.info("Proxying HLS request from S3 for stream: {}, file: {}, S3 key: {}", id, filename, s3Key);
 
         try {
             GetObjectRequest getObjectRequest = GetObjectRequest.builder()
@@ -121,12 +143,7 @@ public class HlsProxyController {
 
             ResponseInputStream<GetObjectResponse> s3Object = s3Client.getObject(getObjectRequest);
 
-            String contentType = "video/MP2T";
-            if (filename.endsWith(".m3u8")) {
-                contentType = "application/x-mpegURL";
-            } else if (filename.endsWith(".vtt")) {
-                contentType = "text/vtt";
-            }
+            String contentType = getContentType(filename);
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_TYPE, contentType)
@@ -138,6 +155,16 @@ public class HlsProxyController {
         } catch (Exception e) {
             log.error("Error proxying HLS file: {} for stream: {}, S3 key: {}", filename, id, s3Key, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    private String getContentType(String filename) {
+        if (filename.endsWith(".m3u8")) {
+            return "application/x-mpegURL";
+        } else if (filename.endsWith(".vtt")) {
+            return "text/vtt";
+        } else {
+            return "video/MP2T";
         }
     }
 }

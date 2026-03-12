@@ -22,7 +22,7 @@ minio:
   accessKey: ${MINIO_ACCESS_KEY}
   secretKey: ${MINIO_SECRET_KEY}
   region: ${MINIO_REGION:us-east-1}
-  bucket: live-streams
+  bucket: pbs
 
 app:
   stream:
