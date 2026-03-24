@@ -24,20 +24,14 @@ public class StreamService {
         return repository.findByStreamKey(streamKey).map(stream -> {
             String lockKey = "stream_lock:" + streamKey;
             Boolean isLocked = redisTemplate.opsForValue().setIfAbsent(lockKey, "locked",
-                    java.time.Duration.ofMinutes(1));
+                    java.time.Duration.ofSeconds(10));
 
             if (isLocked == null || !isLocked) {
-                log.info("Stream {} is already being processed (lock exists), skipping", streamKey);
+                log.info("Stream {} is already being updated (burst protection), skipping job push", streamKey);
                 return true;
             }
-            log.info("Stream {} lock ACQUIRED for processing", streamKey);
+            log.info("Stream {} lock ACQUIRED for processing/reconnection", streamKey);
 
-            if (stream.getStatus() == StreamStatus.LIVE) {
-                log.info("Stream {} is already LIVE in DB, skipping job push", streamKey);
-                // We keep the lock for a while to prevent race conditions during state
-                // transition
-                return true;
-            }
             stream.setStatus(StreamStatus.LIVE);
             // Consistent manifest URL pointing to our proxy
             stream.setManifestUrl("/api/live/proxy/" + stream.getId() + "/index.m3u8");
@@ -48,8 +42,9 @@ public class StreamService {
                     "{\"streamId\":\"%s\", \"key\":\"%s\", \"userId\":\"%s\"}",
                     stream.getId(), streamKey, userId);
 
+            log.info(">>> [TRACE] Pushing job to Redis list 'transcode_jobs_v2' for stream: {}", stream.getId());
             redisTemplate.opsForList().leftPush("transcode_jobs_v2", jobPayload);
-            log.info("Job pushed to Redis for key: {} with payload: {}", streamKey, jobPayload);
+            log.info(">>> [TRACE] Job SUCCESSFULLY pushed for key: {}", streamKey);
             return true;
         }).orElseGet(() -> {
             log.error("Stream key not found: {}", streamKey);

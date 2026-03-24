@@ -4,6 +4,8 @@ import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -51,7 +53,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> body) {
+    public ResponseEntity<?> login(@RequestBody Map<String, String> body, HttpServletResponse response) {
         String email = body.get("email");
         String password = body.get("password");
 
@@ -62,6 +64,14 @@ public class AuthController {
                     if (passwordEncoder.matches(password, user.getPassword())) {
                         System.out.println("Login successful for email: " + email);
                         String token = jwtService.generateToken(user.getEmail());
+                        
+                        // Set session cookie for media players (HLS requests)
+                        Cookie sessionCookie = new Cookie("playbbit_session", token);
+                        sessionCookie.setPath("/");
+                        sessionCookie.setHttpOnly(true);
+                        sessionCookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
+                        response.addCookie(sessionCookie);
+
                         Map<String, Object> userMap = Map.of(
                                 "id", user.getId(),
                                 "name", user.getName() != null ? user.getName() : "",

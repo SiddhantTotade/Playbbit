@@ -60,6 +60,7 @@ public class ResumableUploadController {
             @RequestParam("uploadId") String uploadId,
             @RequestParam("totalSize") long totalSize,
             @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "accessPin", required = false) String accessPin,
             @RequestParam("fileName") String fileName) throws Exception {
 
         String userId = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -86,11 +87,12 @@ public class ResumableUploadController {
 
             // 1. Create the video record synchronously so the database row is committed
             // and visible to the frontend's polling before the async process starts.
-            transcodingService.createInitialVideoRecord(uploadId, title, description, userId, isPrivate, thumbnailUrl);
+            transcodingService.createInitialVideoRecord(uploadId, title, description, userId, isPrivate, accessPin,
+                    thumbnailUrl);
 
             // 2. Start the heavy transcoding process asynchronously.
             transcodingService.processUploadAsync(fileToProcess, fileName, uploadId, userId, title, description,
-                    isPrivate,
+                    isPrivate, accessPin,
                     thumbnailUrl);
             return ResponseEntity.ok("COMPLETE");
         }

@@ -35,13 +35,14 @@ public class TranscodingService {
     private static final String HLS_OUTPUT_DIR = "hls-output/";
 
     public Video createInitialVideoRecord(String uploadId, String title, String description, String userId,
-            boolean isPrivate, String thumbnailUrl) {
+            boolean isPrivate, String accessPin, String thumbnailUrl) {
         Video video = Video.builder()
                 .id(uploadId)
                 .title(title)
                 .description(description)
                 .userId(userId)
                 .isPrivate(isPrivate)
+                .accessPin(accessPin)
                 .thumbnailUrl(thumbnailUrl)
                 .status(Video.VideoStatus.TRANSCODING)
                 .createdAt(LocalDateTime.now())
@@ -51,7 +52,7 @@ public class TranscodingService {
 
     @Async
     public void processUploadAsync(File inputFile, String originalName, String uploadId, String userId, String title,
-            String description, boolean isPrivate, String thumbnailUrl) {
+            String description, boolean isPrivate, String accessPin, String thumbnailUrl) {
         log.info("!!! ASYNC PROCESS STARTED for uploadId: {} !!!", uploadId);
         log.info("Input file path: {}, exists: {}", inputFile.getAbsolutePath(), inputFile.exists());
         String topic = "/topic/upload/" + uploadId;

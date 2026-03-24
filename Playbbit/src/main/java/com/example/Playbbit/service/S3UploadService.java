@@ -25,7 +25,7 @@ public class S3UploadService {
         this.minioProperties = minioProperties;
     }
 
-    public void uploadChunk(File file, String s3Path) {
+    public boolean uploadChunk(File file, String s3Path) {
         try {
             String contentType = "video/MP2T";
             if (file.getName().endsWith(".m3u8")) {
@@ -47,9 +47,11 @@ public class S3UploadService {
             // if (file.getName().endsWith(".ts") && file.exists()) {
             // file.delete();
             // }
+            return true;
         } catch (Exception e) {
             log.error(">>> S3 UPLOAD FAILED for {}: {} bucket: {}", s3Path, e.getMessage(),
                     minioProperties.getBucket());
+            return false;
         }
     }
 

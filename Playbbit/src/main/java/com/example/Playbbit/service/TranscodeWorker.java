@@ -1,11 +1,22 @@
 package com.example.Playbbit.service;
 
 import java.io.File;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.UUID;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+
+import com.example.Playbbit.entity.StreamEntity;
+import com.example.Playbbit.repository.StreamRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,162 +30,174 @@ public class TranscodeWorker {
     private final StringRedisTemplate redisTemplate;
     private final S3UploadService s3UploadService;
     private final MinioProperties minioProperties;
+    private final StreamRepository streamRepository;
+    
+    // Track active upload loops
+    private final ConcurrentHashMap<String, AtomicBoolean> activeWorkers = new ConcurrentHashMap<>();
 
-    @Value("${app.stream.ingest-base-url}")
-    private String ingestBaseUrl;
+    // The shared volume from nginx-rtmp where HLS chunks are written natively
+    private final String HLS_DIR = "/tmp/hls";
 
     @Scheduled(fixedDelay = 1000)
     public void pollJobs() {
-        String jobJson = redisTemplate.opsForList().rightPop("transcode_jobs_v2");
-        if (jobJson != null) {
-            log.info(">>> WORKER FOUND JOB: {}", jobJson);
-            processVideo(jobJson);
+        try {
+            String jobJson = redisTemplate.opsForList().rightPop("transcode_jobs_v2");
+            if (jobJson != null) {
+                log.info(">>> [TRACE] WORKER POPPED S3 UPLOAD JOB: {}", jobJson);
+                processStreamUploads(jobJson);
+            }
+        } catch (Exception e) {
+            log.error(">>> [TRACE] Error polling Redis: {}", e.getMessage());
         }
     }
 
-    private void processVideo(String json) {
+    private void processStreamUploads(String json) {
         String streamId = extractFromJson(json, "streamId");
         String streamKey = extractFromJson(json, "key");
         if (streamKey == null)
             streamKey = extractFromJson(json, "streamKey"); // fallback
         String userId = extractFromJson(json, "userId");
+
+        // Prevent duplicate processing
+        AtomicBoolean isRunning = activeWorkers.get(streamId);
+        if (isRunning != null && isRunning.get()) {
+            log.info(">>> Existing S3 upload worker for {} is alive. Terminating old worker.", streamId);
+            isRunning.set(false); // Stop the old loop
+        }
+
+        AtomicBoolean keepRunning = new AtomicBoolean(true);
+        activeWorkers.put(streamId, keepRunning);
+
         String s3SubPath = PathUtils.getS3UploadPath(PathUtils.LIVE_STREAMS_FOLDER, userId, streamId);
-        String subPath = PathUtils.sanitizeUserId(userId) + "/" + streamId;
-        String outputDir = "/tmp/hls/" + subPath;
-        File outDirFile = new File(outputDir);
-        boolean created = outDirFile.mkdirs();
-        log.info(">>> Output Dir: {}, Created: {}, Exists: {}, Writable: {}",
-                outputDir, created, outDirFile.exists(), outDirFile.canWrite());
-        log.info(">>> S3 Path (prefix): {}", s3SubPath);
-        log.info(">>> S3 Bucket: {}", minioProperties.getBucket());
-        log.info(">>> Input URL: {}/{}", ingestBaseUrl, streamKey);
+        
+        final String fStreamId = streamId;
+        final String fStreamKey = streamKey;
 
-        ProcessBuilder pb = new ProcessBuilder(
-                "ffmpeg",
-                "-analyzeduration", "10M",
-                "-probesize", "10M",
-                "-i", ingestBaseUrl + "/" + streamKey,
-                "-map", "0:v?", "-map", "0:a?",
-                "-c:v", "libx264", "-preset", "veryfast",
-                "-tune", "zerolatency",
-                "-profile:v", "main", "-level:v", "4.1",
-                "-pix_fmt", "yuv420p",
-                "-g", "60", "-bf", "0", "-sc_threshold", "0",
-                "-c:a", "aac", "-b:a", "128k", "-ac", "2",
-                "-ar", "44100",
-                "-af", "aresample=async=1",
-                "-f", "hls",
-                "-hls_flags", "independent_segments",
-                "-hls_time", "4",
-                "-hls_list_size", "6",
-                "-hls_playlist_type", "event",
-                outputDir + "/index.m3u8");
+        new Thread(() -> {
+            log.info(">>> STARTING S3 UPLOAD WATCHER for Stream ID: {}, Key: {}", fStreamId, fStreamKey);
+            Set<String> uploadedFiles = new HashSet<>();
+            File folder = new File(HLS_DIR);
 
-        pb.redirectErrorStream(true);
-
-        try {
-            // Give the RTMP stream a second to stabilize
-            Thread.sleep(2000);
-            Process process = pb.start();
-
-            java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(2);
-
-            executor.submit(() -> {
-                try (java.io.BufferedReader r = new java.io.BufferedReader(
-                        new java.io.InputStreamReader(process.getInputStream()))) {
-                    String l;
-                    while ((l = r.readLine()) != null)
-                        log.info("FFMPEG [{}]: {}", streamId, l);
-                } catch (Exception e) {
-                    log.error("Error reading FFMPEG output for {}: {}", streamId, e.getMessage());
+            try {
+                // Keep polling while the stream is live in the database AND keepRunning is true
+                while (keepRunning.get() && isStreamLiveInDb(fStreamId)) {
+                    uploadExistingFiles(folder, fStreamKey, s3SubPath, uploadedFiles, false);
+                    Thread.sleep(2000); // Check every 2 seconds
                 }
-            });
-
-            executor.submit(() -> {
+                log.info(">>> Stream {} is no longer live. Doing final S3 upload pass.", fStreamId);
+            } catch (Exception e) {
+                log.error(">>> [TRACE] Error in S3 Upload Loop for {}: {}", fStreamId, e.getMessage());
+            } finally {
+                // Final upload pass when stream ends
+                uploadExistingFiles(folder, fStreamKey, s3SubPath, uploadedFiles, true);
+                log.info(">>> S3 UPLOAD WATCHER STOPPED for Stream ID: {}. Waiting 60s before cleanup...", fStreamId);
                 try {
-                    java.util.Set<String> uploadedFiles = new java.util.HashSet<>();
-                    File folder = new File(outputDir);
-
-                    while (process.isAlive()) {
-                        uploadExistingFiles(folder, s3SubPath, uploadedFiles);
-                        Thread.sleep(2000);
-                    }
-
-                    int exitCode = process.waitFor();
-                    log.info(">>> FFMPEG PROCESS ENDED for: {}. Exit code: {}", streamId, exitCode);
-                    Thread.sleep(3000);
-
-                    uploadExistingFiles(folder, s3SubPath, uploadedFiles);
-                    log.info(">>> VOD COMPLETE: {} finalize finished. Final file count: {}", streamId,
-                            uploadedFiles.size());
-
-                    // Clean up local files after some delay to ensure last proxy requests are
-                    // served
-                    Thread.sleep(10000);
-                    deleteLocalFolder(folder);
-                } catch (InterruptedException e) {
-                    log.warn("Upload thread interrupted for {}", streamId);
+                    Thread.sleep(60000); // Wait 1 minute for players to clear buffer
+                } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
-                } catch (Exception e) {
-                    log.error("Error during upload process for {}: {}", streamId, e.getMessage(), e);
-                } finally {
-                    executor.shutdown();
                 }
-            });
+                cleanupLocalHlsFiles(folder, fStreamKey);
+                activeWorkers.remove(fStreamId);
+            }
+        }).start();
+    }
 
+    private boolean isStreamLiveInDb(String streamIdStr) {
+        try {
+            UUID uuid = UUID.fromString(streamIdStr);
+            Optional<StreamEntity> opt = streamRepository.findById(uuid);
+            return opt.isPresent() && opt.get().getStatus() == com.example.Playbbit.entity.StreamStatus.LIVE;
         } catch (Exception e) {
-            log.error(">>> FAILED TO START FFMPEG for {}: {}", streamId, e.getMessage(), e);
+            log.error("Error checking stream state: {}", e.getMessage());
+            return false;
         }
     }
 
-    private void uploadExistingFiles(File folder, String subPath, java.util.Set<String> uploadedFiles) {
+    private void uploadExistingFiles(File folder, String streamKey, String s3SubPath, Set<String> uploadedFiles, boolean isFinalPass) {
+        if (!folder.exists() || !folder.isDirectory()) {
+            log.warn(">>> HLS directory does not exist or is not a directory: {}", folder.getAbsolutePath());
+            return;
+        }
+
         File[] files = folder.listFiles();
-        if (files == null) {
-            log.warn(">>> Directory listing failed for: {}", folder.getAbsolutePath());
+        if (files == null || files.length == 0) {
             return;
         }
-        if (files.length == 0) {
-            log.info(">>> No files found in directory: {}", folder.getAbsolutePath());
-            return;
+
+        // Find the latest segment to skip if not a final pass
+        String latestSegment = null;
+        int maxSeq = -1;
+
+        if (!isFinalPass) {
+            for (File f : files) {
+                String name = f.getName();
+                if (name.startsWith(streamKey + "-") && name.endsWith(".ts")) {
+                    try {
+                        String seqStr = name.substring(streamKey.length() + 1, name.lastIndexOf("."));
+                        int seq = Integer.parseInt(seqStr);
+                        if (seq > maxSeq) {
+                            maxSeq = seq;
+                            latestSegment = name;
+                        }
+                    } catch (Exception e) {
+                        // Ignore files that don't match the format
+                    }
+                }
+            }
         }
-        log.info(">>> Scan in {}: found {} files", folder.getName(), files.length);
 
         for (File f : files) {
-            if (f.isDirectory())
-                continue;
-            String s3Path = subPath + "/" + f.getName();
-            if (f.getName().endsWith(".ts")) {
-                if (!uploadedFiles.contains(f.getName())) {
-                    log.info(">>> UPLOADING CHUNK: {} to bucket: {}", s3Path, minioProperties.getBucket());
-                    s3UploadService.uploadChunk(f, s3Path);
-                    uploadedFiles.add(f.getName());
-                } else {
-                    log.debug(">>> Skipping already uploaded chunk: {}", f.getName());
+            if (f.isDirectory()) continue;
+            
+            String filename = f.getName();
+            
+            // Only process files belonging to this streamKey
+            if (filename.startsWith(streamKey)) {
+                // Skip the latest segment if not final pass
+                if (!isFinalPass && filename.equals(latestSegment)) {
+                    continue;
                 }
-            } else if (f.getName().endsWith(".m3u8")) {
-                log.info(">>> UPLOADING MANIFEST: {} to bucket: {}", s3Path, minioProperties.getBucket());
-                s3UploadService.uploadChunk(f, s3Path);
-            } else {
-                log.info(">>> Found non-hls file: {}", f.getName());
+
+                // Map streamKey.m3u8 -> index.m3u8 in S3 bucket
+                String targetFilename = filename;
+                if (filename.equals(streamKey + ".m3u8")) {
+                    targetFilename = "index.m3u8";
+                }
+
+                String s3Path = s3SubPath + "/" + targetFilename;
+
+                if (filename.endsWith(".ts")) {
+                    if (!uploadedFiles.contains(filename)) {
+                        log.debug(">>> UPLOADING CHUNK: {} to bucket: {}", s3Path, minioProperties.getBucket());
+                        boolean uploaded = s3UploadService.uploadChunk(f, s3Path);
+                        if (uploaded) {
+                            uploadedFiles.add(filename);
+                        }
+                    }
+                } else if (filename.endsWith(".m3u8")) {
+                    // Always upload the latest playlist manifest
+                    log.debug(">>> UPLOADING MANIFEST: {} to bucket: {}", s3Path, minioProperties.getBucket());
+                    s3UploadService.uploadChunk(f, s3Path);
+                }
             }
         }
     }
 
-    private void deleteLocalFolder(File folder) {
-        if (folder.exists()) {
-            File[] files = folder.listFiles();
-            if (files != null) {
-                for (File f : files) {
-                    if (f.isDirectory()) {
-                        deleteLocalFolder(f);
-                    } else {
-                        f.delete();
-                    }
+    private void cleanupLocalHlsFiles(File folder, String streamKey) {
+        if (!folder.exists() || !folder.isDirectory()) return;
+        
+        File[] files = folder.listFiles();
+        if (files == null || files.length == 0) return;
+
+        int deletedCount = 0;
+        for (File f : files) {
+            if (f.getName().startsWith(streamKey)) {
+                if (f.delete()) {
+                    deletedCount++;
                 }
             }
-            folder.delete();
-            log.info(">>> CLEANED UP local HLS folder: {}", folder.getAbsolutePath());
         }
+        log.info(">>> CLEANUP: Deleted {} local HLS files for key: {}", deletedCount, streamKey);
     }
 
     private String extractFromJson(String json, String key) {

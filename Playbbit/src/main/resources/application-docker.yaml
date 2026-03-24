@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://postgres:5432/${PLAYBBIT_DB}
+    url: jdbc:postgresql://infra-postgres-1:5432/${PLAYBBIT_DB}
     username: ${DB_USER}
     password: ${DB_PASSWORD}
 
@@ -14,11 +14,11 @@ spring:
 
   data:
     redis:
-      host: redis
+      host: infra-redis-1
       port: 6379
 
 minio:
-  endpoint: http://minio:9000
+  endpoint: http://infra-minio-1:9000
   accessKey: ${MINIO_ACCESS_KEY}
   secretKey: ${MINIO_SECRET_KEY}
   region: ${MINIO_REGION:us-east-1}
@@ -26,4 +26,4 @@ minio:
 
 app:
   stream:
-    ingest-base-url: "rtmp://ingest:1935/live"
+    ingest-base-url: "rtmp://infra-ingest-1:1935/live"

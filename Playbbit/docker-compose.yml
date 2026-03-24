@@ -10,6 +10,8 @@ services:
       SPRING_PROFILES_ACTIVE: docker
     ports:
       - "8080:8080"
+    volumes:
+      - hls_data:/tmp/hls
     networks:
       - playbbit-network
     extra_hosts:
@@ -18,3 +20,8 @@ services:
 networks:
   playbbit-network:
     external: true
+
+volumes:
+  hls_data:
+    external: true
+    name: infra_hls_data

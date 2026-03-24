@@ -37,6 +37,8 @@ public class Video {
     @com.fasterxml.jackson.annotation.JsonProperty("isPrivate")
     private boolean isPrivate;
 
+    private String accessPin;
+
     private String thumbnailUrl;
 
     @Enumerated(EnumType.STRING)
