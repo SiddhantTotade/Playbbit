@@ -28,10 +28,12 @@ public class S3UploadService {
     public boolean uploadChunk(File file, String s3Path) {
         try {
             String contentType = "video/MP2T";
-            if (file.getName().endsWith(".m3u8")) {
+            if (s3Path.endsWith(".m3u8")) {
                 contentType = "application/x-mpegURL";
-            } else if (file.getName().endsWith(".vtt")) {
+            } else if (s3Path.endsWith(".vtt")) {
                 contentType = "text/vtt";
+            } else if (s3Path.endsWith(".mp4")) {
+                contentType = "video/mp4";
             }
 
             s3Client.putObject(
@@ -96,6 +98,22 @@ public class S3UploadService {
             }
         } catch (Exception e) {
             System.err.println("Error deleting S3 folder: " + e.getMessage());
+        }
+    }
+
+    public boolean checkObjectExists(String s3Path) {
+        try {
+            s3Client.headObject(
+                    software.amazon.awssdk.services.s3.model.HeadObjectRequest.builder()
+                            .bucket(minioProperties.getBucket())
+                            .key(s3Path)
+                            .build());
+            return true;
+        } catch (software.amazon.awssdk.services.s3.model.NoSuchKeyException e) {
+            return false;
+        } catch (Exception e) {
+            log.error("Error checking object existence for {}: {}", s3Path, e.getMessage());
+            return false;
         }
     }
 }

@@ -72,6 +72,12 @@ public class TranscodingService {
             if (!outputFolder.exists())
                 outputFolder.mkdirs();
 
+            // Preserve the original upload in MinIO for quality-accurate downloads
+            messagingTemplate.convertAndSend(topic, "Preserving original...");
+            String originalKey = PathUtils.getS3UploadPath(PathUtils.VIDEOS_FOLDER, userId, uploadId) + "/original.mp4";
+            s3UploadService.uploadChunk(inputFile, originalKey);
+            log.info("Original file preserved in MinIO at: {}", originalKey);
+
             // 1. Detect Streams using ffprobe
             ObjectMapper mapper = new ObjectMapper();
             ProcessBuilder probePb = new ProcessBuilder(

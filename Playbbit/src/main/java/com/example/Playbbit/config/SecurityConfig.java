@@ -45,6 +45,7 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.GET, "/api/videos/feed").permitAll()
                                                 .requestMatchers(HttpMethod.GET, "/api/videos/live/public").permitAll()
                                                 .requestMatchers(HttpMethod.GET, "/api/videos/*").permitAll()
+                                                .requestMatchers(HttpMethod.GET, "/api/videos/*/download").permitAll()
                                                 .requestMatchers(HttpMethod.POST, "/api/videos/*/verify").permitAll()
                                                 .requestMatchers("/api/live/**").permitAll()
                                                 .requestMatchers("/validate", "/done").permitAll()
@@ -60,11 +61,11 @@ public class SecurityConfig {
         public CorsConfigurationSource corsConfigurationSource() {
                 CorsConfiguration configuration = new CorsConfiguration();
                 configuration.setAllowedOriginPatterns(List.of(
-                                "http://localhost:*", 
+                                "http://localhost:*",
                                 "http://127.0.0.1:*",
-                                "https://localhost:*", 
-                                "https://127.0.0.1:*"
-                ));
+                                "https://localhost:*",
+                                "https://127.0.0.1:*",
+                                "http://10.10.3.144:*"));
                 configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
                 configuration.setAllowedHeaders(Arrays.asList(
                                 "Authorization",

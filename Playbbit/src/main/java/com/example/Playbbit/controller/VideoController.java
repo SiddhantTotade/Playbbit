@@ -22,6 +22,8 @@ import com.example.Playbbit.service.JwtService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import java.util.Map;
@@ -38,6 +40,7 @@ public class VideoController {
     private final VideoLinkService videoLinkService;
     private final S3UploadService s3UploadService;
     private final JwtService jwtService;
+    private final com.example.Playbbit.service.DownloadService downloadService;
 
     /** Public feed of all published videos (used by homepage) */
     @GetMapping("/feed")
@@ -58,68 +61,50 @@ public class VideoController {
         Video video = videoOpt.get();
         System.out.println("Video found: " + video.getTitle() + " (Status: " + video.getStatus() + ")");
         if (video.isPrivate()) {
-            String authName = SecurityContextHolder.getContext().getAuthentication() != null ? 
-                                 SecurityContextHolder.getContext().getAuthentication().getName() : null;
-            String currentUser = (authName == null || "anonymousUser".equals(authName)) ? "None" : authName;
-            System.out.println(">>> [VideoController] DEBUG: authName=" + authName + ", currentUser=" + currentUser);
             String owner = video.getUserId();
+            String currentUser = (SecurityContextHolder.getContext().getAuthentication() != null) 
+                                 ? SecurityContextHolder.getContext().getAuthentication().getName() 
+                                 : "anonymousUser";
+            boolean isOwner = currentUser != null && !"anonymousUser".equals(currentUser) && currentUser.equals(owner);
+            boolean authorized = isOwner;
 
-            boolean isOwner = currentUser != null && owner != null && owner.trim().equalsIgnoreCase(currentUser.trim());
-            boolean hasCookie = false;
+            System.out.println(">>> [VideoController] PRIVATE VIDEO: ID=" + id + ", User=" + currentUser + ", Owner=" + owner + ", isOwner=" + isOwner);
 
-            if (request.getCookies() != null) {
-                for (Cookie cookie : request.getCookies()) {
-                    String cookieName = cookie.getName() != null ? cookie.getName().trim() : "";
-                    String targetName = ("stream_access_" + id).trim();
-                    if (cookieName.equals(targetName)) {
+            if (!authorized && request.getCookies() != null) {
+                String targetCookieName = "stream_access_" + id;
+                for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
+                    if (targetCookieName.equals(cookie.getName())) {
                         String token = cookie.getValue();
+                        System.out.println(">>> [VideoController] Found access cookie for ID=" + id);
                         if (jwtService.validateToken(token)) {
-                            String tokenSubject = jwtService.getEmailFromToken(token);
                             String tokenVideoId = jwtService.getVideoIdFromToken(token);
-                            
-                            // CRITICAL: Token MUST be bound to THIS video ID
-                            boolean isCorrectVideo = id.equalsIgnoreCase(tokenVideoId);
-                            if (!isCorrectVideo) {
-                                System.out.println(">>> [VideoController] WRONG VIDEO token. TokenVideoId=" + tokenVideoId + ", RequestId=" + id);
-                                continue;
-                            }
-
-                            // Grant access if:
-                            // 1. Token is the generic viewer proxy
-                            // 2. OR Token matches the owner
-                            // 3. OR Token subject matches the current logged-in user
-                            boolean isGuestToken = "viewer@playbbit.com".equals(tokenSubject);
-                            boolean isOwnerToken = tokenSubject.equalsIgnoreCase(owner);
-                            boolean isSelfToken = currentUser != null && !"None".equals(currentUser) && tokenSubject.equalsIgnoreCase(currentUser);
-
-                            if (isGuestToken || isOwnerToken || isSelfToken) {
-                                hasCookie = true;
-                                System.out.println(">>> [VideoController] VALID access cookie found. Subject=" + tokenSubject + ", VideoId=" + tokenVideoId + ", isOwner=" + isOwnerToken);
+                            if (id.equals(tokenVideoId)) {
+                                authorized = true;
+                                System.out.println(">>> [VideoController] Authorized via Cookie for ID=" + id);
                                 break;
-                            } else {
-                                System.out.println(">>> [VideoController] MISMASHED identity. TokenSubject=" + tokenSubject + ", CurrentUser=" + currentUser);
                             }
                         }
                     }
                 }
             }
-            if (!hasCookie) System.out.println(">>> [VideoController] No relevant cookie found in request.");
 
-            if (isOwner) {
-                // If owner, automatically set the access cookie so subsequent HLS requests work
-                String token = jwtService.generateToken(currentUser, id); // Bind to this ID
-                Cookie cookie = new Cookie("stream_access_" + id, token);
-                cookie.setPath("/");
-                cookie.setHttpOnly(true);
-                cookie.setMaxAge(3600 * 4); // 4 hours
-                response.addCookie(cookie);
-                System.out.println(">>> [VideoController] ACCESS GRANTED to OWNER: ID=" + id + ", User=" + currentUser + ", Owner=" + owner);
-            } else if (!hasCookie) {
-                System.out.println(">>> [VideoController] ACCESS RESTRICTED: ID=" + id + ", User=" + currentUser + ", Owner=" + owner + ", hasCookie=false");
-                // Hide the HLS URL but return the video object so the UI can show the PIN form
+            if (!authorized) {
+                System.out.println(">>> [VideoController] ACCESS DENIED: ID=" + id);
                 video.setHlsUrl(null);
             } else {
-                System.out.println(">>> [VideoController] ACCESS GRANTED via cookie: ID=" + id + ", User=" + currentUser);
+                System.out.println(">>> [VideoController] ACCESS GRANTED: ID=" + id);
+                
+                // If owner but no cookie yet, set it to help downstream HLS requests
+                if (isOwner) {
+                     String token = jwtService.generateToken(currentUser, id);
+                     ResponseCookie resCookie = ResponseCookie.from("stream_access_" + id, token)
+                            .path("/")
+                            .httpOnly(true)
+                            .maxAge(3600 * 4)
+                            .sameSite("Lax")
+                            .build();
+                     response.addHeader(HttpHeaders.SET_COOKIE, resCookie.toString());
+                }
             }
         }
 
@@ -148,18 +133,86 @@ public class VideoController {
             boolean isAuthAnonymous = authName == null || "anonymousUser".equals(authName);
             String subject = isAuthAnonymous ? "viewer@playbbit.com" : authName;
             System.out.println(">>> [VideoController] DEBUG PIN VERIFIED: ID=" + id + ", subject=" + subject);
-            String token = jwtService.generateToken(subject, id); // Bind to this ID
-
-            Cookie cookie = new Cookie("stream_access_" + id, token);
-            cookie.setPath("/");
-            cookie.setHttpOnly(true);
-            cookie.setMaxAge(3600 * 4); // 4 hours
-            response.addCookie(cookie);
-
+            String token = jwtService.generateToken(subject, id);
+            ResponseCookie resCookie = ResponseCookie.from("stream_access_" + id, token)
+                    .path("/")
+                    .httpOnly(true)
+                    .maxAge(3600 * 4)
+                    .sameSite("Lax")
+                    .build();
+            response.addHeader(HttpHeaders.SET_COOKIE, resCookie.toString());
+            System.out.println(">>> [VideoController] PIN VERIFIED: ID=" + id + ", Cookie set: " + resCookie.getName());
             return ResponseEntity.ok(Map.of("status", "success"));
         }
 
         return ResponseEntity.status(403).body(Map.of("error", "Incorrect PIN"));
+    }
+
+    @GetMapping("/{id}/download")
+    public ResponseEntity<Map<String, String>> prepareVideoDownload(@PathVariable String id, HttpServletRequest request) {
+        Optional<Video> videoOpt = videoRepository.findById(id);
+        if (videoOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Video video = videoOpt.get();
+
+        // 1. Authorization check based on privacy (same logic as getVideoById simplified)
+        if (video.isPrivate()) {
+            String currentUser = (SecurityContextHolder.getContext().getAuthentication() != null)
+                    ? SecurityContextHolder.getContext().getAuthentication().getName()
+                    : "anonymousUser";
+            boolean isOwner = currentUser != null && !"anonymousUser".equals(currentUser) && currentUser.equals(video.getUserId());
+            boolean authorized = isOwner;
+
+            if (!authorized && request.getCookies() != null) {
+                String targetCookieName = "stream_access_" + id;
+                for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
+                    if (targetCookieName.equals(cookie.getName())) {
+                        String token = cookie.getValue();
+                        if (jwtService.validateToken(token) && id.equals(jwtService.getVideoIdFromToken(token))) {
+                            authorized = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!authorized) {
+                return ResponseEntity.status(403).body(Map.of("error", "Unauthorized to download this secure video"));
+            }
+        }
+
+        // 2. Check MinIO state — prefer original file (exact source quality)
+        String baseKey = com.example.Playbbit.util.PathUtils.getS3UploadPath(
+                com.example.Playbbit.util.PathUtils.VIDEOS_FOLDER, video.getUserId(), id);
+
+        String originalKey = baseKey + "/original.mp4";
+        if (s3UploadService.checkObjectExists(originalKey)) {
+            String presignedUrl = videoLinkService.generatePresignedUrl(originalKey, java.time.Duration.ofHours(4), video.getTitle());
+            return ResponseEntity.ok(Map.of("status", "READY", "url", presignedUrl));
+        }
+
+        // Fall back to ffmpeg-compiled download.mp4 for older videos
+        String s3Key = baseKey + "/download.mp4";
+        boolean fileExists = s3UploadService.checkObjectExists(s3Key);
+
+        if (fileExists) {
+            String presignedUrl = videoLinkService.generatePresignedUrl(s3Key, java.time.Duration.ofHours(4), video.getTitle());
+            return ResponseEntity.ok(Map.of("status", "READY", "url", presignedUrl));
+        }
+
+        // 3. Initiate or Check Processing
+        String currentStatus = downloadService.getStatus(id);
+        if ("PROCESSING".equals(currentStatus)) {
+            return ResponseEntity.status(202).body(Map.of("status", "PROCESSING", "message", "Video is compiling into MP4..."));
+        } else if ("FAILED".equals(currentStatus)) {
+            return ResponseEntity.status(500).body(Map.of("status", "FAILED", "message", "Download preparation failed"));
+        } else {
+            // "NOT_FOUND" case - kick off process
+            String currentAuth = (SecurityContextHolder.getContext().getAuthentication() != null) ? SecurityContextHolder.getContext().getAuthentication().getName() : "anonymousUser";
+            downloadService.prepareDownloadAsync(id, video.getUserId(), false);
+            return ResponseEntity.status(202).body(Map.of("status", "PROCESSING", "message", "Download compiling started."));
+        }
     }
 
     /** Get the currently authenticated user's own videos */

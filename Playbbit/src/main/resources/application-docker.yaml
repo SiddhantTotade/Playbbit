@@ -19,6 +19,7 @@ spring:
 
 minio:
   endpoint: http://infra-minio-1:9000
+  external-url: ${MINIO_EXTERNAL_URL:}
   accessKey: ${MINIO_ACCESS_KEY}
   secretKey: ${MINIO_SECRET_KEY}
   region: ${MINIO_REGION:us-east-1}

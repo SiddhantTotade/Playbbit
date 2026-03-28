@@ -61,8 +61,12 @@ public class AuthController {
 
         return userRepository.findByEmail(email)
                 .map(user -> {
-                    if (passwordEncoder.matches(password, user.getPassword())) {
-                        System.out.println("Login successful for email: " + email);
+                    System.out.println("Processing login for: " + email);
+                    System.out.println("Incoming password length: " + (password != null ? password.length() : 0));
+                    boolean matches = passwordEncoder.matches(password, user.getPassword());
+                    System.out.println("Password match result: " + matches);
+                    if (matches) {
+                       System.out.println("Login successful for email: " + email);
                         String token = jwtService.generateToken(user.getEmail());
                         
                         // Set session cookie for media players (HLS requests)

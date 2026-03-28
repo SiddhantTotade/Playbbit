@@ -24,8 +24,11 @@ public class S3Config {
 
     @Bean
     public S3Presigner s3Presigner(MinioProperties properties) {
+        String endpoint = (properties.getExternalUrl() != null && !properties.getExternalUrl().isEmpty()) 
+                            ? properties.getExternalUrl() : properties.getEndpoint();
         return S3Presigner.builder()
-                .endpointOverride(URI.create(properties.getEndpoint()))
+                .endpointOverride(URI.create(endpoint))
+                .serviceConfiguration(software.amazon.awssdk.services.s3.S3Configuration.builder().pathStyleAccessEnabled(true).build())
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create(properties.getAccessKey(), properties.getSecretKey())))
                 .region(Region.of(properties.getRegion()))

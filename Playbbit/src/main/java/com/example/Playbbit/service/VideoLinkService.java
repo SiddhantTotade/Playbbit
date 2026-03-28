@@ -24,4 +24,23 @@ public class VideoLinkService {
     public String getAccessUrl(StreamEntity video) {
         return video.getManifestUrl();
     }
+
+    public String generatePresignedUrl(String key, Duration duration, String forceDownloadFilename) {
+        try {
+            GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                    .signatureDuration(duration)
+                    .getObjectRequest(req -> {
+                        req.bucket(minioProperties.getBucket()).key(key);
+                        if (forceDownloadFilename != null && !forceDownloadFilename.isEmpty()) {
+                            req.responseContentDisposition("attachment; filename=\"" + forceDownloadFilename.replaceAll("[^a-zA-Z0-9.-]", "_") + ".mp4\"");
+                        }
+                    })
+                    .build();
+
+            return s3Presigner.presignGetObject(presignRequest).url().toString();
+        } catch (Exception e) {
+            System.err.println("Failed to generate presigned URL for key " + key + ": " + e.getMessage());
+            return null;
+        }
+    }
 }

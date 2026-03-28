@@ -6,6 +6,9 @@ import java.util.UUID;
 import java.security.Principal;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,13 +34,19 @@ public class StreamController {
     private final StreamRepository streamRepository;
     private final VideoLinkService videoLinkService;
     private final JwtService jwtService;
+    private final com.example.Playbbit.service.S3UploadService s3UploadService;
+    private final com.example.Playbbit.service.DownloadService downloadService;
 
     public StreamController(StreamService streamService, StreamRepository streamRepository,
-            VideoLinkService videoLinkService, JwtService jwtService) {
+            VideoLinkService videoLinkService, JwtService jwtService,
+            com.example.Playbbit.service.S3UploadService s3UploadService,
+            com.example.Playbbit.service.DownloadService downloadService) {
         this.streamService = streamService;
         this.streamRepository = streamRepository;
         this.videoLinkService = videoLinkService;
         this.jwtService = jwtService;
+        this.s3UploadService = s3UploadService;
+        this.downloadService = downloadService;
     }
 
     @PostMapping("/api/live/create")
@@ -120,18 +129,78 @@ public class StreamController {
 
         if (stream.getAccessPin() != null && stream.getAccessPin().equals(pin)) {
             // Generate a token for this stream access
-            String token = jwtService.generateToken("viewer@playbbit.com"); // Dummy email as JwtService requires it
+            // Bind to current user if logged in, otherwise use viewer proxy.
+            String authName = SecurityContextHolder.getContext().getAuthentication() != null ? 
+                                 SecurityContextHolder.getContext().getAuthentication().getName() : null;
+            boolean isAuthAnonymous = authName == null || "anonymousUser".equals(authName);
+            String subject = isAuthAnonymous ? "viewer@playbbit.com" : authName;
 
-            Cookie cookie = new Cookie("stream_access_" + id, token);
-            cookie.setPath("/");
-            cookie.setHttpOnly(true);
-            cookie.setMaxAge(3600 * 4); // 4 hours
-            // cookie.setSecure(true); // Enable if using HTTPS
-            response.addCookie(cookie);
+            String token = jwtService.generateToken(subject, id.toString());
+
+            ResponseCookie resCookie = ResponseCookie.from("stream_access_" + id, token)
+                    .path("/")
+                    .httpOnly(true)
+                    .maxAge(3600 * 4)
+                    .sameSite("Lax")
+                    .build();
+            response.addHeader(HttpHeaders.SET_COOKIE, resCookie.toString());
 
             return ResponseEntity.ok(Map.of("manifestUrl", videoLinkService.getAccessUrl(stream)));
         }
 
         return ResponseEntity.status(403).body(Map.of("error", "Incorrect PIN"));
+    }
+
+    @GetMapping("/api/live/{id}/download")
+    public ResponseEntity<Map<String, String>> prepareStreamDownload(@PathVariable UUID id, jakarta.servlet.http.HttpServletRequest request) {
+        Optional<StreamEntity> streamOpt = streamRepository.findById(id);
+        if (streamOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        StreamEntity stream = streamOpt.get();
+
+        // 1. Authorization check based on privacy
+        if (stream.getVisibility() == Visibility.PRIVATE) {
+            String currentUser = (SecurityContextHolder.getContext().getAuthentication() != null)
+                    ? SecurityContextHolder.getContext().getAuthentication().getName()
+                    : "anonymousUser";
+            boolean isOwner = currentUser != null && !"anonymousUser".equals(currentUser) && currentUser.equals(stream.getUserId());
+            boolean authorized = isOwner;
+
+            if (!authorized && request.getCookies() != null) {
+                String targetCookieName = "stream_access_" + id;
+                for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
+                    if (targetCookieName.equals(cookie.getName())) {
+                        String token = cookie.getValue();
+                        if (jwtService.validateToken(token) && id.toString().equals(jwtService.getVideoIdFromToken(token))) {
+                            authorized = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!authorized) {
+                return ResponseEntity.status(403).body(Map.of("error", "Unauthorized to download this secure stream"));
+            }
+        }
+
+        String s3Key = "playbbit-live-streams/" + com.example.Playbbit.util.PathUtils.sanitizeUserId(stream.getUserId()) + "/" + id + "/download.mp4";
+        boolean fileExists = s3UploadService.checkObjectExists(s3Key);
+
+        if (fileExists) {
+            String presignedUrl = videoLinkService.generatePresignedUrl(s3Key, java.time.Duration.ofHours(4), stream.getTitle());
+            return ResponseEntity.ok(Map.of("status", "READY", "url", presignedUrl));
+        }
+
+        String currentStatus = downloadService.getStatus(id.toString());
+        if ("PROCESSING".equals(currentStatus)) {
+            return ResponseEntity.status(202).body(Map.of("status", "PROCESSING", "message", "Stream is compiling into MP4..."));
+        } else if ("FAILED".equals(currentStatus)) {
+            return ResponseEntity.status(500).body(Map.of("status", "FAILED", "message", "Download preparation failed"));
+        } else {
+            downloadService.prepareDownloadAsync(id.toString(), stream.getUserId(), true);
+            return ResponseEntity.status(202).body(Map.of("status", "PROCESSING", "message", "Download compiling started."));
+        }
     }
 }
